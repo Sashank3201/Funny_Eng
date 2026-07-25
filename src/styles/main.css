@@ -1,0 +1,431 @@
+/* ---------------------------------------------------------------- tokens -- */
+
+:root {
+  --ink: #f4f2ef;
+  --ink-dim: rgba(244, 242, 239, 0.66);
+  --ink-faint: rgba(244, 242, 239, 0.42);
+  --accent: #ffb469;
+  --line: rgba(244, 242, 239, 0.16);
+
+  --font-display: 'Space Grotesk', 'Inter', ui-sans-serif, system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --pad: clamp(1.25rem, 4vw, 3.5rem);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Where the hole sits in the frame. Must track the focusX/focusY breakpoint
+     in Renderer.ts so the poster and the live render agree. */
+  --hole-x: 50%;
+  --hole-y: 30%;
+}
+
+@media (min-width: 900px) {
+  :root {
+    --hole-x: 68%;
+    --hole-y: 48%;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #05050a;
+  color: var(--ink);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------ hero -- */
+
+.hero {
+  position: relative;
+  width: 100%;
+  /* Small-viewport unit keeps the layout stable when mobile browser chrome
+     slides away; the vh value is the fallback for browsers without it. */
+  height: 100vh;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Poster gradient behind the canvas. It is what a no-WebGL visitor sees, and it
+   keeps the page from flashing pure black before the first frame. */
+.hero__poster {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* Mirrors where the simulation actually places the hole, so the fallback and
+     the live render frame the page the same way. */
+  background:
+    radial-gradient(
+      42vmin 42vmin at var(--hole-x) var(--hole-y),
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, 1) 26%,
+      rgba(255, 180, 105, 0.5) 28%,
+      rgba(255, 110, 40, 0.16) 36%,
+      rgba(40, 20, 60, 0.35) 58%,
+      rgba(5, 5, 10, 0) 78%
+    ),
+    radial-gradient(120vmax 90vmax at 78% 12%, rgba(60, 34, 96, 0.4), transparent 62%),
+    radial-gradient(90vmax 70vmax at 12% 88%, rgba(18, 40, 84, 0.4), transparent 60%),
+    #05050a;
+}
+
+.hero__canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.2s var(--ease);
+}
+
+.has-webgl .hero__canvas {
+  opacity: 1;
+}
+
+/* Once WebGL is driving, the poster only needs to cover the very first frame. */
+.has-webgl .hero__poster {
+  opacity: 0;
+  transition: opacity 1.4s var(--ease) 0.3s;
+}
+
+.no-webgl .hero__canvas {
+  display: none;
+}
+
+/* Scrim: guarantees text contrast over whatever the simulation happens to be
+   doing behind it. */
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, rgba(3, 3, 8, 0.86) 0%, rgba(3, 3, 8, 0.35) 42%, transparent 68%),
+    linear-gradient(to top, rgba(3, 3, 8, 0.8) 0%, transparent 38%);
+}
+
+.hero__content {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  padding: var(--pad);
+  gap: 1rem;
+}
+
+/* ------------------------------------------------------------------- top -- */
+
+.hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hero__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.hero__mark::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px 2px rgba(255, 180, 105, 0.7);
+}
+
+.hero__links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.hero__link {
+  color: var(--ink-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  transition: color 0.25s var(--ease);
+}
+
+.hero__link:hover,
+.hero__link:focus-visible {
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ copy -- */
+
+.hero__main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: min(38rem, 92%);
+}
+
+.hero__eyebrow {
+  margin: 0 0 1.1rem;
+  font-family: var(--font-mono);
+  font-size: clamp(0.7rem, 1.4vw, 0.82rem);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.hero__name {
+  margin: 0;
+  font-size: clamp(3.2rem, 13vw, 9rem);
+  font-weight: 500;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  /* A faint warm rim, as if the disk were lighting the letterforms. */
+  text-shadow: 0 0 60px rgba(255, 170, 90, 0.22);
+}
+
+.hero__tagline {
+  margin: 1.5rem 0 0;
+  max-width: 34ch;
+  font-size: clamp(1rem, 1.9vw, 1.2rem);
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 2.4rem;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.9rem;
+  padding: 0 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  background: rgba(244, 242, 239, 0.04);
+  backdrop-filter: blur(6px);
+  transition:
+    background 0.3s var(--ease),
+    border-color 0.3s var(--ease),
+    transform 0.3s var(--ease);
+}
+
+.btn:hover,
+.btn:focus-visible {
+  background: rgba(244, 242, 239, 0.12);
+  border-color: rgba(244, 242, 239, 0.4);
+  transform: translateY(-2px);
+}
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #17110a;
+}
+
+.btn--primary:hover,
+.btn--primary:focus-visible {
+  background: #ffc78d;
+  border-color: #ffc78d;
+}
+
+:where(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+/* ---------------------------------------------------------------- bottom -- */
+
+.hero__bottom {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.hero__caption {
+  margin: 0;
+  max-width: 30ch;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.6;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.hero__scroll {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hero__scroll span::after {
+  content: '';
+  display: block;
+  width: 1px;
+  height: 2.6rem;
+  margin: 0.5rem auto 0;
+  background: linear-gradient(to bottom, var(--ink-faint), transparent);
+  animation: trickle 2.6s var(--ease) infinite;
+  transform-origin: top;
+}
+
+@keyframes trickle {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 0;
+  }
+}
+
+/* --------------------------------------------------------------- reveals -- */
+
+.hero__eyebrow,
+.hero__name,
+.hero__tagline,
+.hero__actions,
+.hero__top,
+.hero__bottom {
+  opacity: 0;
+  transform: translateY(1.1rem);
+  transition:
+    opacity 1s var(--ease),
+    transform 1s var(--ease);
+}
+
+.hero.is-ready .hero__top {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.1s;
+}
+.hero.is-ready .hero__eyebrow {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.35s;
+}
+.hero.is-ready .hero__name {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.45s;
+}
+.hero.is-ready .hero__tagline {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.6s;
+}
+.hero.is-ready .hero__actions {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.72s;
+}
+.hero.is-ready .hero__bottom {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.85s;
+}
+
+/* ------------------------------------------------------------ responsive -- */
+
+@media (max-width: 640px) {
+  .hero__scrim {
+    background:
+      linear-gradient(to top, rgba(3, 3, 8, 0.92) 0%, rgba(3, 3, 8, 0.45) 45%, transparent 78%),
+      radial-gradient(90vmax 60vmax at 20% 62%, rgba(3, 3, 8, 0.72), transparent 70%);
+  }
+
+  .hero__main {
+    max-width: 100%;
+    justify-content: flex-end;
+    padding-bottom: 1rem;
+  }
+
+  .hero__links {
+    gap: 1rem;
+  }
+
+  .hero__scroll {
+    display: none;
+  }
+
+  .btn {
+    flex: 1 1 auto;
+  }
+}
+
+@media (min-width: 1800px) {
+  .hero__main {
+    max-width: 44rem;
+  }
+}
+
+/* ------------------------------------------------------- reduced motion -- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .hero__eyebrow,
+  .hero__name,
+  .hero__tagline,
+  .hero__actions,
+  .hero__top,
+  .hero__bottom {
+    opacity: 1;
+    transform: none;
+  }
+
+  .hero__scroll span::after {
+    animation: none;
+    opacity: 0.5;
+    transform: scaleY(1);
+  }
+}
