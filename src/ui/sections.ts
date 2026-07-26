@@ -11,6 +11,37 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+/**
+ * The hero name, split into per-glyph spans.
+ *
+ * Each glyph carries `--a`, its distance from the middle of the word normalised
+ * to 0..1, which the stylesheet turns into a chromatic fringe that grows toward
+ * the ends. Splitting it here rather than in CSS is what makes that possible —
+ * there is no selector for "how far along a word is this letter".
+ *
+ * The letters are hidden from assistive technology and the whole heading carries
+ * an `aria-label` instead, so a screen reader announces the name rather than
+ * spelling it out one character at a time.
+ */
+function heroWordmark(text: string): HTMLElement {
+  const h1 = el('h1', 'hero__name reveal');
+  h1.setAttribute('aria-label', text);
+
+  const chars = [...text];
+  const mid = (chars.length - 1) / 2;
+  for (const [i, ch] of chars.entries()) {
+    if (ch === ' ') {
+      h1.append(' ');
+      continue;
+    }
+    const glyph = el('span', 'glyph', ch);
+    glyph.setAttribute('aria-hidden', 'true');
+    glyph.style.setProperty('--a', (Math.abs(i - mid) / (mid || 1)).toFixed(3));
+    h1.append(glyph);
+  }
+  return h1;
+}
+
 /** A short mono label with a rule, used to open every section. */
 function sectionLabel(text: string, index: string): HTMLElement {
   const wrap = el('div', 'label');
@@ -70,7 +101,7 @@ export function renderSections(root: HTMLElement): void {
   const heroInner = el('div', 'section__inner');
   heroInner.append(
     el('p', 'hero__eyebrow reveal', hero.eyebrow),
-    el('h1', 'hero__name reveal', hero.headline),
+    heroWordmark(hero.headline),
     el('p', 'hero__standfirst reveal', hero.standfirst),
   );
 

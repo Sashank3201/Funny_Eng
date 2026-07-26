@@ -47,6 +47,10 @@
   --rule: rgba(242, 239, 233, 0.14);
 
   --display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  /* The name is set as a wordmark rather than as a heading — heavy grotesque,
+     not the editorial serif the section headings use. Inter Tight's variable
+     axis already reaches 900, so this costs no extra font. */
+  --headline: 'Inter Tight', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --body: 'Inter Tight', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
@@ -365,7 +369,8 @@ main {
 /* Text over a live render needs help that is not a panel. A soft dark shadow
    is invisible as an object but lifts legibility wherever the disk drifts
    behind a word. */
-.hero__name,
+/* The hero name is not in this group: its glyphs carry their own shadow stack,
+   which has to include the dark spread rather than inherit it. */
 .contact__headline,
 .project__title {
   text-shadow:
@@ -386,12 +391,54 @@ main {
 
 .hero__name {
   margin: 0;
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: clamp(3.6rem, 12vw, 10rem);
-  line-height: 0.86;
-  letter-spacing: -0.02em;
+  font-family: var(--headline);
+  font-weight: 900;
+  /* Capped lower than the old serif's 10rem even though this face is heavier.
+     Set as uppercase in a black weight, seven letters run about 40 % wider than
+     the serif did, and the hole now sits further left to keep its bright limb
+     inside the frame — at 9.5rem the last letter landed on the disk's upper arc. */
+  font-size: clamp(3.2rem, 10vw, 8.5rem);
+  line-height: 0.9;
+  letter-spacing: -0.028em;
+  text-transform: uppercase;
+  color: #fffdf8;
   text-wrap: balance;
+}
+
+/*
+ * Chromatic aberration on the wordmark.
+ *
+ * Warm displaced one way, cool the other, so each stem carries an amber edge on
+ * one side and a cyan edge on the other while its core stays white — the same
+ * artefact a fast lens leaves on a bright subject.
+ *
+ * The offset is not constant. It grows from nothing at the middle of the word to
+ * its full value at either end, because transverse chromatic aberration is a
+ * radial effect: a real lens is clean on axis and worst at the edges. That is
+ * the same law the composite shader applies to the render (`d * r²`), which is
+ * what makes the type read as part of the same photograph rather than as
+ * something pasted on top of it. `--a` is the glyph's normalised distance from
+ * the centre, measured in `sections.ts` and handed over as a custom property.
+ */
+.hero__name .glyph {
+  /* The floor is deliberately non-zero: a lens is cleanest on axis but never
+     perfectly clean, and letting the middle letters go pure white reads as a
+     effect switched off rather than as an optic. */
+  --o: calc(0.010em + var(--a, 0) * 0.026em);
+  display: inline-block;
+  text-shadow:
+    /* warm fringe, displaced outward one way */
+    calc(var(--o) * -1) 0 0 rgba(255, 178, 88, 0.92),
+    calc(var(--o) * -1.9) 0 0.028em rgba(255, 96, 36, 0.55),
+    /* cool fringe, the other */
+    var(--o) 0 0 rgba(104, 214, 255, 0.92),
+    calc(var(--o) * 1.9) 0 0.028em rgba(64, 112, 255, 0.5),
+    /* bloom, then the dark spread that keeps it legible over the live render */
+    0 0 0.16em rgba(255, 250, 242, 0.34),
+    0 0 0.42em rgba(255, 246, 232, 0.26),
+    0 0 1.05em rgba(198, 220, 255, 0.20),
+    0 2px 30px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.5);
 }
 
 .hero__standfirst {
