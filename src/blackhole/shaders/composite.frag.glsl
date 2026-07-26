@@ -15,6 +15,7 @@ uniform float uAberration;
 uniform float uGrain;
 uniform float uVignette;
 uniform float uContrast;
+uniform float uSaturation;
 uniform vec3 uShadowTint;
 uniform vec3 uHighlightTint;
 
@@ -67,6 +68,11 @@ void main() {
 
   // Filmic S-curve.
   col = mix(col, col * col * (3.0 - 2.0 * col), uContrast);
+
+  // ACES pulls saturation out of the highlights, which greys the hottest part
+  // of the disk. Push a little back before the split-tone.
+  float grey = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = mix(vec3(grey), col, uSaturation);
 
   // Split-toning: cool shadows, warm highlights. Subtle, and it is what makes
   // the amber disk sit in the frame rather than on top of it.

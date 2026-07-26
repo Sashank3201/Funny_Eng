@@ -4,59 +4,59 @@
  * The initial guess comes from cheap capability signals; the governor is what
  * actually protects the frame rate, since no static probe reliably predicts
  * fill-rate on mobile GPUs.
+ *
+ * Per-pixel geodesic integration is far more expensive than drawing particles,
+ * so `rayScale` and `maxSteps` are the load-bearing knobs here — resolution and
+ * integration depth, not object counts. Temporal accumulation converges the
+ * result over several frames, which is what makes marching at well below native
+ * resolution acceptable.
  */
 
 export type TierName = 'high' | 'medium' | 'low';
 
 export interface Tier {
   name: TierName;
-  /** Number of accretion-disk particles. */
-  particles: number;
-  /** Number of jet particles. */
-  jetParticles: number;
-  /** Multiplier on the main render-target resolution. */
-  renderScale: number;
+  /** Fraction of native resolution the geodesic march runs at. */
+  rayScale: number;
+  /** RK4 steps per ray. Compiled in as a #define, so changing it recompiles. */
+  maxSteps: number;
+  /** Angular step ceiling for the march, in radians. */
+  maxStepAngle: number;
   /** Levels in the bloom pyramid. */
   bloomLevels: number;
   /** Upper bound on devicePixelRatio. */
   maxPixelRatio: number;
-  /**
-   * Whether backdrop-filter glass is affordable. It forces the compositor to
-   * re-read the live WebGL canvas every frame, which is genuinely expensive on
-   * weaker hardware.
-   */
-  glass: boolean;
+  /** Jets are volumetric and sampled every step — the first thing to drop. */
+  jets: boolean;
 }
 
-// Counts are lower than they were for round sprites: a motion-blurred streak
-// covers far more area than a dot, so fewer of them fill the disk.
 export const TIERS: Record<TierName, Tier> = {
   high: {
     name: 'high',
-    particles: 200_000,
-    jetParticles: 45_000,
-    renderScale: 1.0,
+    rayScale: 0.75,
+    maxSteps: 256,
+    maxStepAngle: 0.07,
     bloomLevels: 5,
-    maxPixelRatio: 2,
-    glass: true,
+    maxPixelRatio: 1.75,
+    jets: true,
   },
   medium: {
     name: 'medium',
-    particles: 90_000,
-    jetParticles: 22_000,
-    renderScale: 0.85,
+    rayScale: 0.55,
+    maxSteps: 160,
+    maxStepAngle: 0.10,
     bloomLevels: 4,
-    maxPixelRatio: 1.75,
-    glass: true,
+    maxPixelRatio: 1.5,
+    jets: true,
   },
   low: {
     name: 'low',
-    particles: 35_000,
-    jetParticles: 9_000,
-    renderScale: 0.7,
+    rayScale: 0.40,
+    maxSteps: 96,
+    maxStepAngle: 0.15,
     bloomLevels: 3,
-    maxPixelRatio: 1.5,
-    glass: false,
+    maxPixelRatio: 1.25,
+    jets: false,
   },
 };
 
@@ -104,14 +104,14 @@ export class QualityGovernor {
   private accum = 0;
   private frames = 0;
   private sustainedSlow = 0;
-  private cooldown = 1.5;
+  private cooldown = 2.0;
 
   constructor(
     private tier: Tier,
     private readonly onDemote: (tier: Tier) => void,
-    private readonly targetFps = 50,
+    private readonly targetFps = 45,
     /** Seconds of sustained slowness before demoting. */
-    private readonly patience = 2.0,
+    private readonly patience = 1.5,
   ) {}
 
   get current(): Tier {
@@ -121,7 +121,7 @@ export class QualityGovernor {
   /** Feed one frame's delta, in seconds. */
   update(dt: number): void {
     // Ignore the first moments after startup and after a tier change, when
-    // shader compilation and buffer uploads dominate.
+    // shader compilation dominates.
     if (this.cooldown > 0) {
       this.cooldown -= dt;
       return;
@@ -138,11 +138,8 @@ export class QualityGovernor {
     this.accum = 0;
     this.frames = 0;
 
-    if (fps < this.targetFps) {
-      this.sustainedSlow += 0.5;
-    } else {
-      this.sustainedSlow = 0;
-    }
+    if (fps < this.targetFps) this.sustainedSlow += 0.5;
+    else this.sustainedSlow = 0;
 
     if (this.sustainedSlow >= this.patience) {
       this.sustainedSlow = 0;
@@ -154,7 +151,7 @@ export class QualityGovernor {
     const idx = ORDER.indexOf(this.tier.name);
     if (idx < 0 || idx >= ORDER.length - 1) return;
     this.tier = TIERS[ORDER[idx + 1]];
-    this.cooldown = 2.0;
+    this.cooldown = 2.5;
     this.onDemote(this.tier);
   }
 }

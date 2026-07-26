@@ -1,9 +1,9 @@
-# Particle Black Hole — Portfolio Hero
+# Portfolio — geodesic black hole
 
-A single-page portfolio landing page whose hero is a full-viewport, GPU-animated
-particle black hole. The simulation is driven by real Schwarzschild geometry
-rather than a decorative swirl: Keplerian orbits, relativistic Doppler beaming,
-gravitational redshift, and light deflection all come from the actual formulae.
+A portfolio site fronted by a Schwarzschild black hole that is **integrated, not
+faked**: one null geodesic is traced per pixel through curved spacetime, and the
+shadow, photon ring, Einstein ring and the disk's secondary image all fall out
+of that integration rather than being drawn on top.
 
 ## Run it
 
@@ -11,149 +11,152 @@ gravitational redshift, and light deflection all come from the actual formulae.
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # static bundle in dist/
-npm run preview  # serve the built bundle
+npm run preview
 ```
 
-No build plugins beyond Vite — shaders load through Vite's built-in `?raw`
-import.
+## Fill in your content
 
-## Rebranding
+**Everything user-facing lives in [`src/content.ts`](src/content.ts)** — name,
+role, bio, projects, skills, contact. Nothing else in the project hardcodes
+copy.
 
-All copy lives in [`src/content.ts`](src/content.ts): name, tagline, CTAs, and
-links. That is the only file you need to touch. **The name defaults to
-"Sashank"** — change it there.
-
-Colour tokens and type are at the top of
-[`src/styles/main.css`](src/styles/main.css); the glass material is a single
-primitive in [`src/styles/glass.css`](src/styles/glass.css).
+It currently ships full of `TODO` placeholders, and the page says so in the
+corner while they are there. That is deliberate: a portfolio with invented
+projects in it is worse than one that is visibly unfinished. Replace every
+`TODO` and the notice disappears on its own.
 
 ## The physics
 
 [`src/blackhole/physics.ts`](src/blackhole/physics.ts) is the single source of
-truth. It works in geometric units where the Schwarzschild radius `Rs = 1`, and
-emits the same constants into the shaders as `#define`s, so TypeScript and GLSL
+truth, in geometric units where the Schwarzschild radius `Rs = 1`. The same
+constants are injected into GLSL as `#define`s so TypeScript and the shaders
 cannot drift apart.
 
-| Quantity | Value | Where you see it |
+Photon motion in Schwarzschild geometry is planar, so every ray reduces to a 2-D
+problem in its own orbital plane, governed exactly by the Binet form
+
+```
+d²u/dφ² = 3Mu² − u        (u = 1/r)
+```
+
+`geodesic.frag.glsl` integrates this with RK4, per pixel. There is no weak-field
+expansion and no fitted constant anywhere in the render.
+
+| Quantity | Value | How it appears |
 | --- | --- | --- |
-| Event horizon | `Rs` | — |
-| Photon sphere | `1.5 Rs` | the thin bright ring |
-| Shadow radius | `√27/2 ≈ 2.60 Rs` | the black disc, bigger than the horizon |
-| ISCO | `3 Rs` | inner edge of the disk |
+| Event horizon | `2M = Rs` | rays that reach it stop |
+| Photon sphere | `3M = 1.5 Rs` | rays wind here; the bright ring |
+| ISCO | `6M = 3 Rs` | inner edge of the disk |
+| Critical impact parameter | `3√3 M ≈ 2.598 Rs` | the shadow's apparent radius |
 
-- **Keplerian shear** — `Ω = √(M/r³)`, so inner material laps the outer disk and
-  shears it into streaks. Integrated in the vertex shader from a clock uniform.
-- **Doppler beaming** — `δ = 1/(γ(1 − β·n̂))` with observed intensity `∝ δ³`. At
-  the ISCO the orbital speed is ~0.41c, which is why one limb of the disk is
-  white-hot and the other is a dim ember. This asymmetry is the single most
-  recognisable feature in the image.
-- **Gravitational redshift** — `√(1 − Rs/r)`, dimming the innermost disk even
-  where beaming brightens it.
-- **Temperature profile** — Shakura–Sunyaev thin disk, `T ∝ r^(−3/4)`, mapped
-  through a blackbody colour ramp.
-- **Light deflection** — `α = 2Rs/b`. The lens equation `b_img − α(b_img) = b` is
-  solved in closed form, `b_img = ½(b + √(b² + 4k))`, which is what makes the far
-  side of the disk arc up and over the shadow instead of being occluded by it.
+The disk uses a Shakura–Sunyaev flux profile with a zero-torque inner boundary,
+`F ∝ r⁻³(1 − √(r_in/r))`, so emission tapers to nothing at the ISCO. Light from
+it is shifted by
 
-### Two deliberate departures
+```
+g = √(1 − 3M/r) / (1 + Ω λ)      Ω = ±√(M/r³),  λ = L_z/E
+```
 
-Both are called out here rather than hidden in a magic number.
+which carries gravitational redshift and relativistic Doppler in one term.
+Observed intensity goes as `g⁴` (because `I_ν/ν³` is a Lorentz invariant) and
+the observed colour is a blackbody at `g·T`, mapped through a fit to the
+Planckian locus. The bright approaching limb and dim receding limb are
+consequences of that, not art direction.
 
-**The deflection coefficient is pinned, not derived.** The weak-field
-`α = 2Rs/b` is only valid far from the hole. Used verbatim it throws the
-strongly-lensed images out to ~2.8× the shadow radius instead of piling them
-just outside the photon ring, so `k` is set from where the images should land
-(`ARC_RATIO` in `Renderer.ts`). Full geodesic ray-marching would remove the
-fudge at a cost this hero does not need to pay.
+**The one departure:** a Schwarzschild hole cannot launch jets — Blandford–Znajek
+needs spin and an ergosphere. The jets imply a Kerr hole; everything else here
+is Schwarzschild. Their bulk speed is also below a real jet's, because at the
+true value the transverse Doppler term would de-boost them into invisibility at
+this viewing angle.
 
-**The jets imply a hole this simulation does not model.** A Schwarzschild hole
-cannot launch jets — Blandford–Znajek extracts rotational energy through the
-ergosphere, which requires spin. Everything else here is Schwarzschild; the jets
-are the one element that implies Kerr. Their bulk speed is also well below a real
-jet's, because at the true value the transverse Doppler term would de-boost them
-into invisibility at this viewing angle.
+### Verified against theory
 
-## Rendering pipeline
+`physics-test` measures the **rendered pixels** against closed-form GR — it
+reads nothing from the shader's own constants. With the disk off and a flat sky,
+it finds the shadow's edge to sub-pixel accuracy along four rays and compares it
+to the exact angular radius for an observer at finite `r₀`:
 
-Seven stages per frame, all orchestrated in `Renderer.ts`:
+```
+sin ψ = b_crit √(1 − 2M/r₀) / r₀
+```
 
-1. **Starfield** → `rtStars`. Galactic band with dust lanes, domain-warped
-   nebulae, distant galaxies, three parallax layers of stars with blackbody
-   colour and diffraction spikes, all under large-scale extinction. **Cached** —
-   it depends only on parallax and a slow twinkle, never on the camera, so it is
-   redrawn only when one of those actually moves. That cache is what pays for
-   how expensive the pass is.
-2. **Lensing** → `rtBg`. Resamples the starfield through the deflection field,
-   cuts out the shadow, and draws the photon ring.
-3. **Disk + jets** → `rtEmissive`, additive, no depth buffer.
-4. **Temporal accumulation** → history ping-pong. Motion blur, and the reason the
-   disk reads as flowing light rather than a cloud of dots.
-5. **Combine** → `rtScene`. Background plus the accumulated emissive layer.
-6. **Bloom pyramid** — 13-tap downsample chain, 9-tap tent upsample, plus a wide
-   horizontal blur for the anamorphic streak.
-7. **Composite** — bloom, halation, streak, ACES tonemap, filmic S-curve,
-   split-toning, vignette, aberration, grain, manual sRGB encode.
+| Camera distance | Predicted | Measured | Error |
+| --- | --- | --- | --- |
+| 50 Rs | 56.6 px | 56.9 px | **0.56 %** |
+| 34 Rs | 83.0 px | 83.7 px | **0.92 %** |
+| 22 Rs | 127.7 px | 131.5 px | 2.97 % |
 
-### Why streaks
+The close-range figure is step-budget limited and understood: near the photon
+sphere a ray can wind through many radians, and any that exhausts `MAX_STEPS` is
+counted as captured, which inflates the shadow slightly. Raising the budget from
+256 to 700 steps takes the 22 Rs error from 4.6 % to 3.0 %, confirming it is
+discretization rather than a modelling error.
 
-Each disk and jet particle is an instanced quad stretched along the direction it
-travels on screen during one shutter interval. The streak vector comes from
-projecting the particle twice — now, and one shutter later — and taking the
-screen-space difference, so it inherits the Keplerian shear and the lensing warp
-for free: inner material draws longer streaks, and streaks bend correctly where
-they wrap the shadow. Round sprites read as speckle; this reads as light.
+## Design
 
-Accumulation is applied to the emissive layer **only**. Blending the stars into
-the history would smear them too. The blend weight rises with camera speed, which
-is what stops the trails following the camera instead of the orbit.
+The page has **no panels behind its text**. Instead the camera is choreographed
+against scroll position ([`src/scroll/choreography.ts`](src/scroll/choreography.ts)):
+each section declares a pose, the renderer damps toward it, and the bright parts
+of the scene are deliberately moved out from wherever the words are. Contrast
+comes from composition, which is only possible because the render is ours to
+aim. A soft edgeless veil and text shadows cover the residual.
+
+Type is **Instrument Serif** for display — a high-contrast editorial face
+against a hard-science subject, which is the page's one deliberate risk —
+with **Inter Tight** for body and **JetBrains Mono** for data and labels. All
+self-hosted; no font CDN. The palette is taken from the simulation: the ground
+is the blue-black of deep space, the accent is the disk's own blackbody amber,
+and the cool tone is its Doppler-blueshifted limb.
 
 ## Performance
 
-Three quality tiers (200k / 90k / 35k disk particles, with matching jet counts,
-render scale and bloom depth), picked from device signals, then a runtime
-governor that demotes one tier after 2s of sustained sub-50fps. Demotion is
-one-way — oscillating between tiers is more noticeable than simply running at the
-lower one.
+Per-pixel geodesic integration is expensive, so three levers carry it:
 
-Also: `devicePixelRatio` capped per tier, bloom at half resolution and below, the
-starfield cached, the loop paused on `visibilitychange`, and resize debounced.
+- **Reduced-resolution march.** The lensed field is smooth except at the photon
+  ring, so rays are traced at a fraction of native and upscaled.
+- **Temporal accumulation as AA.** Each frame jitters the ray on a Halton
+  sequence and converges into a history buffer. This is what buys back the
+  detail lost to marching below native resolution.
+- **Three tiers** (rayScale 0.75/0.55/0.40, 256/160/96 steps), picked from
+  device signals, with a governor that demotes one tier after sustained
+  sub-45fps. Demotion is one-way — oscillating is worse than running lower.
 
-`backdrop-filter` forces the compositor to re-read the live canvas every frame,
-so the glass blur is dropped on the low tier and on coarse pointers. The glass
-surfaces keep their geometry either way — only the blur goes.
+`?tier=high|medium|low` and `?steps=N` override both, for testing.
 
-## Accessibility and fallbacks
+**Frame rate is unverified.** The development container has no GPU — Chromium
+falls back to a software rasteriser — so no frame-rate claim in this repo has
+been measured on real hardware. Correctness, layout, contrast and fallbacks
+were all verified; speed was not.
 
-- Every word is real DOM text; the canvas is `aria-hidden`. Nothing is painted
-  into WebGL.
-- The headline panel is masked so it dissolves toward the hole rather than
-  cutting a rectangle across the frame. The fade is sized to start well past the
-  copy — verified at 1024 / 1440 / 1920 / 2560.
-- `prefers-reduced-motion: reduce` renders exactly one static frame and never
-  starts the animation loop or the accumulation.
-- No WebGL, or a renderer that throws → CSS poster gradient, copy untouched.
+## Accessibility
+
+- Every word is real DOM text; the canvas is `aria-hidden`.
+- Contrast measured against the **live render** — 69 text runs sampled per pass,
+  worst ratio 5.75–6.2 across runs. One run in three showed a single small-text
+  run dipping to 2.2 as the idle camera drift moved the disk behind it.
+- `prefers-reduced-motion: reduce` renders one static frame and never starts
+  the loop (verified: zero `requestAnimationFrame` calls).
+- No WebGL → CSS poster, all content and links intact.
 
 ## Layout
 
 ```
 src/
-  content.ts              copy — the only file to edit when rebranding
-  main.ts                 bootstrap, WebGL + reduced-motion + glass guards
+  content.ts                 all copy — the only file to edit
+  main.ts                    bootstrap; wires scroll + pointer to the camera
+  scroll/choreography.ts     section poses and blending
+  ui/sections.ts             builds the DOM from content
   blackhole/
-    physics.ts            constants and formulae, shared with GLSL
-    Renderer.ts           pass graph, targets, camera, loop, governor
-    Disk.ts               instanced streak geometry + material
-    Jet.ts                twin relativistic jets
-    Starfield.ts          background pass
-    fullscreen.ts         fullscreen-triangle pass helper
-    quality.ts            tiers and the FPS governor
+    physics.ts               constants and closed forms, shared with GLSL
+    GeodesicRenderer.ts      pass graph, targets, camera, tiers
+    quality.ts               tiers and the FPS governor
+    fullscreen.ts            fullscreen-triangle pass helper
     shaders/
-      lensing.glsl        shared: lens equation, shadow occlusion
-      streak.glsl         shared: motion-blur quad assembly + capsule coverage
-      *.vert.glsl / *.frag.glsl
-  ui/hero.ts              content binding, pointer, glass sheen, reveal
-  styles/main.css         layout, type, reveals
-  styles/glass.css        the liquid-glass primitive
+      geodesic.frag.glsl     the integrator
+      disk.glsl  jet.glsl  sky.glsl  noise.glsl
+      accumulate / bright / downsample / upsample / anamorphic / composite
+  styles/main.css
+  fonts/
 ```
 
-`window.__blackhole` exposes the renderer for tuning uniforms in devtools.
+`window.__blackhole` exposes the renderer for tuning in devtools.

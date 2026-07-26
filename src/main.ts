@@ -1,68 +1,109 @@
 import './styles/main.css';
-import './styles/glass.css';
 
-import { BlackHoleRenderer } from './blackhole/Renderer';
-import { detectTier } from './blackhole/quality';
-import { bindPointer, renderHeroContent, revealHero } from './ui/hero';
+import { GeodesicRenderer } from './blackhole/GeodesicRenderer';
+import type { TierName } from './blackhole/quality';
+import { content } from './content';
+import { adaptForNarrow, applyPointer, poseForProgress } from './scroll/choreography';
+import { observeReveals, renderChrome, renderSections } from './ui/sections';
 
 function supportsWebGL(): boolean {
   try {
     const canvas = document.createElement('canvas');
-    return Boolean(
-      canvas.getContext('webgl2') ??
-        canvas.getContext('webgl') ??
-        canvas.getContext('experimental-webgl'),
-    );
+    return Boolean(canvas.getContext('webgl2') ?? canvas.getContext('webgl'));
   } catch {
     return false;
   }
 }
 
-/**
- * `backdrop-filter` over a live WebGL canvas forces the compositor to re-read
- * the canvas every frame, which is expensive enough on weaker hardware to cost
- * real frames. The glass surfaces keep their geometry either way — only the
- * blur is dropped.
- */
-function enableGlass(): boolean {
-  if (!detectTier().glass) return false;
-  // A touch device that passed the tier check is still usually a phone.
-  return !window.matchMedia('(pointer: coarse)').matches;
+/** Document scroll progress, 0..1. */
+function scrollProgress(): number {
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  if (max <= 0) return 0;
+  return Math.min(1, Math.max(0, window.scrollY / max));
+}
+
+function applyMeta(): void {
+  document.title = `${content.meta.name} — ${content.meta.role}`;
+  const description = document.querySelector('meta[name="description"]');
+  if (description) description.setAttribute('content', content.meta.description);
+}
+
+/** `?tier=high|medium|low` pins quality — used by the physics self-test, which
+ *  needs a known march resolution to measure against. */
+function forcedTier(): TierName | undefined {
+  const value = new URLSearchParams(location.search).get('tier');
+  return value === 'high' || value === 'medium' || value === 'low' ? value : undefined;
 }
 
 function boot(): void {
-  const hero = document.querySelector<HTMLElement>('.hero');
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
-  if (!hero || !canvas) return;
+  const contentRoot = document.querySelector<HTMLElement>('#content');
+  if (!canvas || !contentRoot) return;
 
-  renderHeroContent(document);
-  revealHero(hero);
-
-  if (enableGlass()) document.documentElement.classList.add('has-glass');
+  applyMeta();
+  renderChrome(document);
+  renderSections(contentRoot);
+  observeReveals();
 
   if (!supportsWebGL()) {
-    // The CSS poster behind the canvas is already visible; just make sure the
-    // dead canvas is out of the way.
     document.documentElement.classList.add('no-webgl');
     return;
   }
 
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  let renderer: BlackHoleRenderer;
+  let renderer: GeodesicRenderer;
   try {
-    renderer = new BlackHoleRenderer({ canvas, reducedMotion });
+    const steps = Number(new URLSearchParams(location.search).get('steps')) || undefined;
+    renderer = new GeodesicRenderer({
+      canvas,
+      reducedMotion,
+      forceTier: forcedTier(),
+      stepOverride: steps,
+    });
   } catch (error) {
-    console.error('Black hole renderer failed to initialise', error);
+    console.error('Geodesic renderer failed to initialise', error);
     document.documentElement.classList.add('no-webgl');
     return;
   }
 
   document.documentElement.classList.add('has-webgl');
+
+  const pointer = { x: 0, y: 0 };
+  const narrow = () => window.innerWidth < 900;
+
+  /**
+   * Scroll position and pointer both feed one pose, which the renderer damps
+   * toward. Routing every input through a single filter is what keeps the
+   * camera continuous — no section ever snaps.
+   */
+  const syncCamera = () => {
+    // The readout annotates the hero; past it, it would sit under the copy.
+    document.documentElement.classList.toggle(
+      'is-scrolled',
+      window.scrollY > window.innerHeight * 0.35,
+    );
+
+    let pose = poseForProgress(scrollProgress());
+    if (narrow()) pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight);
+    renderer.setCamera(applyPointer(pose, pointer.x, pointer.y));
+  };
+
+  syncCamera();
   renderer.start();
 
+  window.addEventListener('scroll', syncCamera, { passive: true });
+
   if (!reducedMotion) {
-    bindPointer(document.body, (x, y) => renderer.setPointer(x, y));
+    window.addEventListener(
+      'pointermove',
+      (event) => {
+        pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+        pointer.y = -((event.clientY / window.innerHeight) * 2 - 1);
+        syncCamera();
+      },
+      { passive: true },
+    );
 
     // Nothing to animate for a hidden tab, and mobile browsers penalise
     // background GPU work hard.
@@ -75,10 +116,13 @@ function boot(): void {
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => renderer.resize(), 120);
+    resizeTimer = window.setTimeout(() => {
+      renderer.resize();
+      syncCamera();
+    }, 120);
   });
 
-  // Expose the instance for the Playwright checks and for tuning in devtools.
+  // Exposed for the physics self-test and for tuning in devtools.
   Object.assign(window, { __blackhole: renderer });
 }
 

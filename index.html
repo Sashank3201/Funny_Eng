@@ -4,63 +4,30 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
-    <title>Sashank — Software Engineer</title>
-    <meta
-      name="description"
-      content="Portfolio of Sashank, software engineer. A real-time particle simulation of a Schwarzschild black hole."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Loaded without blocking the first paint; the system stack in main.css
-         carries the layout until it arrives, and the page is fine without it. -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap"
-      rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap"
-        rel="stylesheet"
-      />
-    </noscript>
+    <title>Portfolio</title>
+    <meta name="description" content="Portfolio" />
   </head>
   <body>
-    <main class="hero">
-      <!-- Poster gradient: the pre-first-frame state, and the no-WebGL fallback. -->
-      <div class="hero__poster" aria-hidden="true"></div>
+    <!-- Poster gradient: the pre-first-frame state, and the no-WebGL fallback. -->
+    <div class="poster" aria-hidden="true"></div>
 
-      <!-- Purely decorative; every word on this page lives in the DOM below. -->
-      <canvas id="scene" class="hero__canvas" aria-hidden="true"></canvas>
+    <!-- Fixed for the whole scroll. Purely decorative; every word is in the DOM. -->
+    <canvas id="scene" class="scene" aria-hidden="true"></canvas>
 
-      <div class="hero__scrim" aria-hidden="true"></div>
+    <!-- A soft, edgeless darkening under the content column. Not a panel: no
+         border, no blur, no rectangle — just enough falloff to guarantee
+         contrast where the camera choreography cannot. -->
+    <div class="veil" aria-hidden="true"></div>
 
-      <div class="hero__content">
-        <header class="hero__top">
-          <span class="hero__mark glass glass--pill">Portfolio</span>
-          <nav
-            class="hero__links glass glass--pill"
-            data-hero-links
-            aria-label="Elsewhere"
-          ></nav>
-        </header>
+    <header class="chrome">
+      <a class="chrome__mark" href="#hero" data-mark></a>
+      <nav class="chrome__nav" data-nav aria-label="Sections"></nav>
+    </header>
 
-        <div class="hero__main">
-          <div class="hero__panel glass">
-            <p class="hero__eyebrow" data-hero-eyebrow></p>
-            <h1 class="hero__name" data-hero-name></h1>
-            <p class="hero__tagline" data-hero-tagline></p>
-            <div class="hero__actions" data-hero-actions></div>
-          </div>
-        </div>
+    <!-- Live annotation of what the simulation is actually integrating. -->
+    <aside class="readout" data-readout aria-hidden="true"></aside>
 
-        <footer class="hero__bottom">
-          <p class="hero__caption glass glass--pill" data-hero-caption></p>
-          <p class="hero__scroll" aria-hidden="true"><span>Scroll</span></p>
-        </footer>
-      </div>
-    </main>
+    <main id="content"></main>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
