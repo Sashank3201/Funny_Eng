@@ -170,7 +170,7 @@ export class GeodesicRenderer {
       // How hard one source is allowed to drive the glare. The beamed limb
       // reaches tens of times this; everything past it is compressed
       // logarithmically rather than fed to the blur at full strength.
-      uBloomClamp: { value: 0.10 },
+      uBloomClamp: { value: 0.07 },
     });
 
     this.downsample = new FullscreenPass(downsampleFrag, {
@@ -213,7 +213,7 @@ export class GeodesicRenderer {
       uKneeStrength: { value: 0.32 },
       // How much of the local structure survives the compression. 1.0 is full
       // detail and rings at edges; 0 collapses to the plain global curve.
-      uDetail: { value: 0.50 },
+      uDetail: { value: 0.55 },
       uShadowTint: { value: new Color(0.9, 0.95, 1.07) },
       uHighlightTint: { value: new Color(1.06, 0.99, 0.92) },
     });

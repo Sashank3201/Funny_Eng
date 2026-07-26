@@ -78,7 +78,7 @@ float shoulder(float l) {
  * the local average is meaningless and an unbounded ratio paints a bright halo
  * along it.
  */
-vec3 localTonemap(vec3 c, float baseLum) {
+vec3 localTonemap(vec3 c, float sceneLum, float baseLum) {
   float l = max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-5);
   float base = max(baseLum, 1e-4);
 
@@ -93,7 +93,20 @@ vec3 localTonemap(vec3 c, float baseLum) {
   // and the base is used only to recover the high-frequency part the compression
   // flattens. Where the scene is locally flat the ratio is 1 and this reduces to
   // the plain global curve.
-  float detail = clamp(l / base, 0.3, 3.0);
+  // The ratio is built from the scene alone, never from the scene plus glare.
+  // Glare is smooth by construction, and it is heaviest exactly on the beamed
+  // limb — so folding it in diluted the ratio toward 1 on the one side that
+  // needed the help, and inflated its brightness while adding no structure.
+  // That, not the disk model, is why the approaching side stayed smooth after
+  // the first attempt at this.
+  float detail = clamp(sceneLum / base, 0.3, 3.0);
+
+  // A flat exponent, deliberately. I tried making it adaptive — restoring
+  // `target - surviving`, where surviving is d(ln v)/d(ln l), so that the term
+  // would add the most exactly where the curve destroyed the most. It is a nicer
+  // argument and it measured worse: on the beamed limb it computes about 0.44
+  // where the flat 0.70 was already being applied, and high-frequency detail
+  // fell on *both* sides, right from 0.140 to 0.093. Kept the simple one.
   float mapped = shoulder(l) * pow(detail, uDetail);
 
   return c * (mapped / l);
@@ -131,6 +144,9 @@ void main() {
   col.g = texture2D(uScene, vUv).g;
   col.b = texture2D(uScene, vUv - off).b;
 
+  // Captured before any glare is added: this is what carries the structure.
+  float sceneLum = dot(col, vec3(0.2126, 0.7152, 0.0722)) * uExposure;
+
   vec3 bloom = texture2D(uBloom, vUv).rgb;
   col += bloom * uBloomIntensity;
 
@@ -147,10 +163,9 @@ void main() {
   vec3 baseCol = texture2D(uBase, vUv).rgb * uExposure;
   float baseLum = dot(baseCol, vec3(0.2126, 0.7152, 0.0722));
 
-  // Glare is added before tone mapping so it is compressed along with
-  // everything else, but it must not pollute the base layer — the base is what
-  // the scene's own low frequencies are, not what the glare made of them.
-  col = acesFilm(localTonemap(col * uExposure, baseLum));
+  // Glare is tone mapped along with everything else, but it contributes only
+  // brightness — the structure term is the scene's.
+  col = acesFilm(localTonemap(col * uExposure, sceneLum, baseLum));
 
   // Filmic S-curve.
   col = mix(col, col * col * (3.0 - 2.0 * col), uContrast);
