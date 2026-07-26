@@ -170,6 +170,60 @@ body {
   text-decoration: none;
 }
 
+.chrome__left {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.75rem, 2vw, 1.4rem);
+}
+
+/* Availability status. A job-seeking portfolio should say so above the fold,
+   and the live dot earns its place by being the one animated thing in the
+   chrome. */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ember);
+  white-space: nowrap;
+}
+
+.status::before {
+  content: '';
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--ember);
+  box-shadow: 0 0 0 0 rgba(255, 178, 107, 0.7);
+  animation: pulse 2.8s var(--ease) infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 178, 107, 0.6); }
+  70% { box-shadow: 0 0 0 0.5rem rgba(255, 178, 107, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 178, 107, 0); }
+}
+
+.project__tag {
+  display: inline-block;
+  transform: translateY(-0.35em);
+  margin-left: 0.4rem;
+  padding: 0.18rem 0.5rem;
+  border: 1px solid rgba(255, 178, 107, 0.45);
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ember);
+  text-shadow: none;
+  vertical-align: middle;
+}
+
 .chrome__nav {
   display: flex;
   gap: clamp(1rem, 2.5vw, 2.2rem);
@@ -647,6 +701,10 @@ main {
   }
 
   .readout {
+    display: none;
+  }
+
+  .status {
     display: none;
   }
 

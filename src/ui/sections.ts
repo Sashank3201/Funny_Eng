@@ -23,10 +23,14 @@ function projectCard(project: Project, index: number): HTMLElement {
   card.style.setProperty('--i', String(index));
 
   const head = el('header', 'project__head');
-  head.append(
-    el('h3', 'project__title', project.title),
-    el('span', 'project__period', project.period),
-  );
+  const title = el('h3', 'project__title', project.title);
+  if (project.example) {
+    // Tagged in the markup, not just the data — anyone reading the page can
+    // see at a glance that this is a layout demonstration, not a claim.
+    const tag = el('span', 'project__tag', 'Example');
+    title.append(' ', tag);
+  }
+  head.append(title, el('span', 'project__period', project.period));
 
   const meta = el('p', 'project__role', project.role);
   const summary = el('p', 'project__summary', project.summary);
@@ -150,8 +154,10 @@ export function renderSections(root: HTMLElement): void {
   // than dressing invented projects up as real ones.
   if (contentIsPlaceholder) {
     const notice = el('p', 'placeholder-notice');
-    notice.textContent =
-      'Placeholder content — edit src/content.ts to replace every TODO.';
+    const exampleCount = content.work.projects.filter((p) => p.example).length;
+    notice.textContent = exampleCount
+      ? `${exampleCount} example projects and some placeholder copy — edit src/content.ts.`
+      : 'Placeholder copy remains — edit src/content.ts.';
     document.body.append(notice);
   }
 }
@@ -160,6 +166,12 @@ export function renderSections(root: HTMLElement): void {
 export function renderChrome(root: ParentNode): void {
   const mark = root.querySelector('[data-mark]');
   if (mark) mark.textContent = content.meta.name;
+
+  const status = root.querySelector('[data-status]');
+  if (status) {
+    if (content.availability) status.textContent = content.availability;
+    else status.remove();
+  }
 
   const nav = root.querySelector('[data-nav]');
   if (nav) {

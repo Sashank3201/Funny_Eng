@@ -2,9 +2,8 @@
  * Every word on the page.
  *
  * This is the only file to edit when the content changes — nothing else in the
- * project hardcodes copy. Anything still marked TODO is a placeholder and will
- * look like one on the page, deliberately: a portfolio with invented projects
- * in it is worse than one that is visibly unfinished.
+ * project hardcodes copy. Anything still marked TODO is a placeholder, and the
+ * page says so in the corner for as long as any remain.
  */
 
 export interface Project {
@@ -22,6 +21,12 @@ export interface Project {
   metric?: string;
   /** Optional links. */
   links?: { label: string; href: string }[];
+  /**
+   * Marks a demonstration entry rather than real work. Renders a visible
+   * "Example" tag — a portfolio that passes invented projects off as real is
+   * worse than one that is visibly unfinished.
+   */
+  example?: boolean;
 }
 
 export interface SkillGroup {
@@ -32,18 +37,20 @@ export interface SkillGroup {
 export const content = {
   /** Document-level metadata. */
   meta: {
-    name: 'TODO — your name',
-    role: 'TODO — your role',
-    /** Used for <title> and the meta description. */
-    description: 'TODO — one sentence describing what you do.',
+    name: 'Sashank',
+    role: 'Cyber Security Analyst',
+    description:
+      'Sashank — cyber security analyst working on systems and their security. Available for work.',
   },
 
+  /** Shown as a live status chip in the header. Set to null to hide it. */
+  availability: 'Available for work',
+
   hero: {
-    eyebrow: 'TODO — role',
-    /** The single <h1>. Keep it to your name. */
-    headline: 'TODO — your name',
-    /** One or two lines. Concrete beats clever. */
-    standfirst: 'TODO — one or two lines on what you build and who for.',
+    eyebrow: 'Cyber Security Analyst',
+    headline: 'Sashank',
+    standfirst:
+      'I work on systems, and on how they hold up when someone goes looking for the weak points.',
     actions: [
       { label: 'See the work', href: '#work', primary: true },
       { label: 'Get in touch', href: '#contact', primary: false },
@@ -52,34 +59,38 @@ export const content = {
 
   work: {
     label: 'Selected work',
-    intro: 'TODO — one line framing the projects below.',
+    intro:
+      'Example entries, shown to lay out the section. Real projects replace them shortly.',
     projects: [
       {
-        title: 'TODO — project name',
+        title: 'Network intrusion detection pipeline',
         period: '2025',
-        role: 'TODO — your role',
-        summary: 'TODO — what it does, and what changed because it exists.',
-        stack: ['TODO', 'TODO'],
-        metric: undefined,
+        role: 'Example entry',
+        summary:
+          'Ingests network flow logs, baselines normal traffic, and raises alerts on patterns that deviate from it.',
+        stack: ['Python', 'Suricata', 'Elasticsearch', 'Kibana'],
         links: [],
+        example: true,
       },
       {
-        title: 'TODO — project name',
+        title: 'Web application security assessment',
         period: '2024',
-        role: 'TODO — your role',
-        summary: 'TODO — what it does, and what changed because it exists.',
-        stack: ['TODO', 'TODO'],
-        metric: undefined,
+        role: 'Example entry',
+        summary:
+          'Black-box assessment of an internal web application, covering authentication, access control and injection surfaces, written up with reproduction steps and fixes.',
+        stack: ['Burp Suite', 'OWASP ZAP', 'Python'],
         links: [],
+        example: true,
       },
       {
-        title: 'TODO — project name',
+        title: 'Phishing simulation programme',
         period: '2024',
-        role: 'TODO — your role',
-        summary: 'TODO — what it does, and what changed because it exists.',
-        stack: ['TODO', 'TODO'],
-        metric: undefined,
+        role: 'Example entry',
+        summary:
+          'Ran controlled phishing campaigns against a consenting internal group and tracked how reporting rates changed with training.',
+        stack: ['GoPhish', 'Python', 'Postfix'],
         links: [],
+        example: true,
       },
     ] as Project[],
   },
@@ -87,23 +98,24 @@ export const content = {
   about: {
     label: 'About',
     paragraphs: [
-      'TODO — what you work on, and how you approach it.',
-      'TODO — background, or what you are looking for next.',
+      'I work on systems and their security — how they are put together, where they are weak, and what happens when someone goes looking for those weaknesses.',
+      'TODO — background: how you got here, what you studied, what you are looking for next.',
     ],
     skills: [
       { label: 'Languages', items: ['TODO'] },
-      { label: 'Frameworks', items: ['TODO'] },
+      { label: 'Security', items: ['TODO'] },
       { label: 'Tools', items: ['TODO'] },
     ] as SkillGroup[],
   },
 
   contact: {
     label: 'Contact',
-    headline: 'TODO — a short invitation to get in touch.',
-    email: 'todo@example.com',
+    headline: 'Available for work — say hello.',
+    email: 'sashank3301@gmail.com',
     socials: [
       { label: 'GitHub', href: 'https://github.com/Sashank3201' },
-      { label: 'LinkedIn', href: '#' },
+      // LinkedIn intentionally omitted until there is a real URL. A link
+      // pointing nowhere is worse than no link.
     ],
   },
 
@@ -113,12 +125,18 @@ export const content = {
    */
   readout: {
     label: 'Schwarzschild black hole',
-    lines: [
-      'Null geodesics integrated per pixel',
-      'd²u/dφ² = 3Mu² − u',
-    ],
+    lines: ['Null geodesics integrated per pixel', 'd²u/dφ² = 3Mu² − u'],
   },
 } as const;
 
-/** True while the content is still placeholder, so the page can say so. */
-export const contentIsPlaceholder = content.meta.name.startsWith('TODO');
+/** Recursively true if any string anywhere still carries a TODO marker. */
+function hasTodo(value: unknown): boolean {
+  if (typeof value === 'string') return value.includes('TODO');
+  if (Array.isArray(value)) return value.some(hasTodo);
+  if (value && typeof value === 'object') return Object.values(value).some(hasTodo);
+  return false;
+}
+
+/** True while any copy is unfinished, or any project is still an example. */
+export const contentIsPlaceholder =
+  hasTodo(content) || content.work.projects.some((p) => p.example);
