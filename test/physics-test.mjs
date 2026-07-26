@@ -11,7 +11,7 @@ import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import fs from 'node:fs';
 
-const OUT = 'process.env.OUT_DIR ?? '.'';
+const OUT = process.env.OUT_DIR ?? '.';
 const URL = 'http://127.0.0.1:4173/?tier=high&steps=700';
 
 // Geometric units, Rs = 1.
