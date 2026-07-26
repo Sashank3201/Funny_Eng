@@ -11,6 +11,10 @@
 // they emerge because rays genuinely wind around the hole and cross the
 // equatorial plane more than once.
 //
+// The disk is a volume, not a surface: emission and absorption are integrated
+// through it front-to-back as the ray goes, so it occludes itself and dims
+// whatever lies behind it.
+//
 // Requires: physics defines, noise.glsl, sky.glsl, disk.glsl, jet.glsl, and a
 // MAX_STEPS define injected per quality tier.
 
@@ -26,7 +30,7 @@ uniform vec2 uJitter;      // sub-pixel offset, in pixels, for temporal AA
 uniform float uSkyBrightness;
 uniform float uIntro;      // 0..1 — eases the curvature up on load
 uniform float uJetOn;
-uniform float uFlatSky;  // 1 = uniform white sky, for the physics self-test
+uniform float uFlatSky;    // 1 = uniform white sky, for the physics self-test
 
 varying vec2 vUv;
 
@@ -81,35 +85,51 @@ void main() {
   // Curvature eases in over the intro, so the hole appears to switch on.
   float mass = MASS * uIntro;
 
-  // ---- Equatorial crossings, known in advance ----------------------------
-  // The ray's height above the disk plane is
-  //   h(φ) = e₁.y cos φ + e₂.y sin φ = C sin(φ + ψ)
-  // so the crossings sit at φ = nπ − ψ. Solving for them up front removes two
-  // trig calls per integration step and gives an exact crossing angle rather
-  // than one recovered by bisection.
-  float A = e1.y;
-  float B = e2.y;
-  float C = sqrt(A * A + B * B);
-  float psi = atan(A, B);
-  bool planeIsEquatorial = C < 1e-4;
-
-  float nextCross = ceil(psi / PI) * PI - psi;
-  if (nextCross <= 1e-4) nextCross += PI;
-
   // ---- March -------------------------------------------------------------
   float phi = 0.0;
-  vec3 emission = vec3(0.0);   // jet light picked up along the way
-  vec3 diskColour = vec3(0.0);
-  bool hitDisk = false;
+  vec3 colour = vec3(0.0);
+  float transmittance = 1.0;
   bool captured = false;
   bool escaped = false;
 
   for (int i = 0; i < MAX_STEPS; i++) {
     float r = 1.0 / u;
-    float h = stepFor(r);
 
-    float uPrev = u;
-    float phiPrev = phi;
+    float cp = cos(phi);
+    float sp = sin(phi);
+    vec3 p = r * (cp * e1 + sp * e2);
+
+    // A step has to be smaller than the disk is thick, or the march strides
+    // clean over it: at 10 Rs a normal step covers ~0.7 Rs while H is 0.5 Rs.
+    // Refine only inside the slab, so the cost lands where it is needed.
+    float h = stepFor(r);
+    float rc = length(p.xz);
+    if (rc > DISK_INNER * 0.7 && rc < DISK_OUTER * 1.2) {
+      float slab = diskScaleHeight(rc) * 4.0;
+      h *= mix(0.2, 1.0, smoothstep(slab * 0.5, slab * 1.6, abs(p.y)));
+    }
+
+    // True arc length for this step. Using dφ directly would make the optical
+    // depth wrong by a factor that varies across the image.
+    float drdphi = -w / (u * u);
+    float ds = sqrt(r * r + drdphi * drdphi) * h;
+
+    // ---- Volume sample --------------------------------------------------
+    float rcSample;
+    float density = diskDensity(p, rcSample);
+    if (density > 0.0) {
+      vec3 emission = diskEmission(p, rcSample, density, lambda);
+      colour += transmittance * emission * ds;
+      transmittance *= exp(-uDiskOpacity * density * ds);
+
+      // Optically thick: nothing further along the ray can reach us.
+      if (transmittance < 0.02) break;
+    }
+
+    // Jet volume, integrated along the same path.
+    if (uJetOn > 0.5 && r < uJetLength * 1.2) {
+      colour += transmittance * jetEmission(p) * ds * 0.06;
+    }
 
     // RK4 on (u' = w, w' = 3Mu² − u).
     float k1u = w;
@@ -141,34 +161,6 @@ void main() {
       break;
     }
 
-    // Did this step carry us through the disk plane?
-    if (!planeIsEquatorial && phi >= nextCross && phiPrev < nextCross) {
-      float t = (nextCross - phiPrev) / h;
-      float uc = mix(uPrev, u, t);
-      float rc = 1.0 / max(uc, 1e-6);
-
-      if (rc >= DISK_INNER && rc <= DISK_OUTER) {
-        vec3 pc = rc * (cos(nextCross) * e1 + sin(nextCross) * e2);
-        diskColour = diskEmission(pc, rc, lambda);
-        hitDisk = true;
-        // The disk is optically thick: the first crossing inside the annulus
-        // is where the ray stops. Crossings outside it pass straight through,
-        // which is exactly how the secondary image forms — those rays sail
-        // over the hole and strike the far side of the disk from beneath.
-        break;
-      }
-      nextCross += PI;
-    }
-
-    // Jet volume, integrated along the path.
-    if (uJetOn > 0.5) {
-      float rr = 1.0 / u;
-      if (rr < uJetLength * 1.2) {
-        vec3 p = rr * (cos(phi) * e1 + sin(phi) * e2);
-        emission += jetEmission(p) * h * rr * 0.06;
-      }
-    }
-
     // Escaped to infinity.
     if (u < 1.0 / ESCAPE_RADIUS && w < 0.0) {
       escaped = true;
@@ -176,12 +168,8 @@ void main() {
     }
   }
 
-  // ---- Shade -------------------------------------------------------------
-  vec3 colour = emission;
-
-  if (hitDisk) {
-    colour += diskColour;
-  } else if (escaped) {
+  // ---- Background --------------------------------------------------------
+  if (escaped && transmittance > 0.0) {
     // The ray's asymptotic direction, reconstructed from the final state.
     float r = 1.0 / u;
     float drdphi = -w / (u * u);
@@ -189,10 +177,13 @@ void main() {
     vec3 radial = cp * e1 + sp * e2;
     vec3 tangential = -sp * e1 + cp * e2;
     vec3 outDir = normalize(drdphi * radial + r * tangential);
-    colour += uFlatSky > 0.5 ? vec3(1.0) : skyRadiance(outDir) * uSkyBrightness;
+
+    vec3 bg = uFlatSky > 0.5 ? vec3(1.0) : skyRadiance(outDir) * uSkyBrightness;
+    colour += transmittance * bg;
   }
-  // Neither: captured, or out of steps deep in the winding region just outside
-  // the photon sphere. Both read as shadow, which is what they are.
+  // Captured, or out of steps deep in the winding region just outside the
+  // photon sphere: both read as shadow, which is what they are. Whatever the
+  // ray picked up before then still shows, correctly attenuated.
 
   gl_FragColor = vec4(colour, 1.0);
 }

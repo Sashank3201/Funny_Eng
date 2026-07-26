@@ -55,8 +55,47 @@ export const DISK_INNER = ISCO;
 /** Radius past which a ray is treated as escaped to infinity. */
 export const ESCAPE_RADIUS = 60.0 * RS;
 
-/** Shakura–Sunyaev thin-disk temperature profile, T ∝ r^(−3/4). */
-export const TEMPERATURE_EXPONENT = 0.75;
+/**
+ * Disk scale height as a fraction of radius, H/R.
+ *
+ * 0.05 is the standard value for a radiatively efficient thin disk. It matters
+ * visually as well as physically: at our framing that is 12 px of thickness at
+ * the ISCO and 41 px at 10 Rs, so the disk reads as a body of gas rather than
+ * the mathematical plane it used to be.
+ */
+export const DISK_SCALE_HEIGHT = 0.05;
+
+/**
+ * Peak of the Page–Thorne flux profile below, used to normalise it to 1.
+ * Computed numerically; the maximum falls at r = 9.5511 M.
+ */
+export const PT_FLUX_PEAK = 1.1458947309e-4;
+
+/**
+ * Page & Thorne (1974) relativistic thin-disk flux, Schwarzschild limit,
+ * normalised to peak at 1. With x = √(r/M):
+ *
+ *   F ∝ r⁻³ · (1 − 3M/r)⁻¹ · x⁻¹ · [ x − √6 + (√3/2)·ln( ((x+√3)(√6−√3)) / ((x−√3)(√6+√3)) ) ]
+ *
+ * This replaces the Newtonian Shakura–Sunyaev form the renderer used to carry.
+ * The difference is not cosmetic: the relativistic profile peaks at 9.55 M
+ * rather than 8.17 M — 17 % further out — and is broader, carrying about 60 %
+ * more flux at 20 M once both are normalised.
+ *
+ * The bracket vanishes exactly at the ISCO, which is the zero-torque inner
+ * boundary condition: matter there is plunging, not radiating.
+ */
+export function pageThorneFlux(r: number): number {
+  const rM = r / MASS;
+  if (rM <= 6) return 0;
+  const x = Math.sqrt(rM);
+  const s3 = Math.sqrt(3);
+  const s6 = Math.sqrt(6);
+  const bracket =
+    x - s6 + (s3 / 2) * Math.log(((x + s3) * (s6 - s3)) / ((x - s3) * (s6 + s3)));
+  const f = (1 / (rM * rM * rM)) * (1 / (1 - 3 / rM)) * (1 / x) * bracket;
+  return Math.max(0, f) / PT_FLUX_PEAK;
+}
 
 /**
  * The exact photon orbit equation in Schwarzschild geometry, in Binet form
@@ -124,7 +163,7 @@ export function glslPhysicsDefines(): string {
     `#define DISK_INNER ${DISK_INNER.toFixed(6)}`,
     `#define DISK_OUTER ${DISK_OUTER.toFixed(6)}`,
     `#define ESCAPE_RADIUS ${ESCAPE_RADIUS.toFixed(6)}`,
-    `#define TEMP_EXP ${TEMPERATURE_EXPONENT.toFixed(6)}`,
+    `#define PT_FLUX_PEAK ${PT_FLUX_PEAK.toExponential(10)}`,
     '',
   ].join('\n');
 }

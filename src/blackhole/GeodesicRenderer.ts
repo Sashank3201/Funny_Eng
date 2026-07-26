@@ -13,7 +13,7 @@ import {
 } from 'three';
 
 import { FullscreenPass } from './fullscreen';
-import { ESCAPE_RADIUS, RS, glslPhysicsDefines } from './physics';
+import { DISK_SCALE_HEIGHT, ESCAPE_RADIUS, RS, glslPhysicsDefines } from './physics';
 import { QualityGovernor, TIERS, detectTier, type Tier, type TierName } from './quality';
 
 import accumulateFrag from './shaders/accumulate.frag.glsl?raw';
@@ -242,7 +242,9 @@ export class GeodesicRenderer {
       uFlatSky: { value: 0 },
       uTime: { value: 0 },
       uDiskTemp: { value: 4400 },
-      uDiskBrightness: { value: 0.62 },
+      uDiskBrightness: { value: 2.6 },
+      uDiskOpacity: { value: 0.85 },
+      uDiskHR: { value: DISK_SCALE_HEIGHT },
       uDiskSpin: { value: 1 },
       uJetBrightness: { value: 0.22 },
       uJetLength: { value: 26 * RS },
@@ -569,8 +571,13 @@ export class GeodesicRenderer {
 
   /** Turn the disk and jets off so the shadow's silhouette can be measured. */
   setFeatures(disk: boolean, jets: boolean): void {
-    this.geodesic.material.uniforms.uDiskBrightness.value = disk ? 0.62 : 0;
-    this.geodesic.material.uniforms.uJetOn.value = jets && this.tier.jets ? 1 : 0;
+    const u = this.geodesic.material.uniforms;
+    u.uDiskBrightness.value = disk ? 2.6 : 0;
+    // Opacity has to go too. Zeroing only the emission would leave invisible
+    // gas still absorbing, and the shadow test would measure that rather than
+    // the silhouette.
+    u.uDiskOpacity.value = disk ? 0.85 : 0;
+    u.uJetOn.value = jets && this.tier.jets ? 1 : 0;
     this.historyDirty = true;
   }
 
@@ -593,6 +600,41 @@ export class GeodesicRenderer {
     c.uContrast.value = enabled ? 0 : 0.2;
     c.uExposure.value = enabled ? 1.0 : 1.15;
     this.geodesic.material.uniforms.uSkyBrightness.value = enabled ? 6.0 : 1.0;
+    this.historyDirty = true;
+  }
+
+  /**
+   * Isolate the disk so its vertical profile can be measured: no sky, no
+   * glare, no grade, and optically thin — so what reaches the camera is pure
+   * emission rather than a saturated slab, whose width would say more about
+   * the opacity than about the scale height.
+   */
+  setDiskProbe(enabled: boolean): void {
+    this.diagnostic = enabled;
+    const c = this.composite.material.uniforms;
+    const g = this.geodesic.material.uniforms;
+
+    c.uGrain.value = enabled ? 0 : 0.012;
+    c.uVignette.value = enabled ? 0 : 0.48;
+    c.uAberration.value = enabled ? 0 : 0.008;
+    c.uBloomIntensity.value = enabled ? 0 : 0.34;
+    c.uStreakIntensity.value = enabled ? 0 : 0.18;
+    c.uHalation.value = enabled ? 0 : 0.12;
+    c.uContrast.value = enabled ? 0 : 0.2;
+    c.uSaturation.value = enabled ? 1 : 1.22;
+    c.uExposure.value = enabled ? 1 : 1.15;
+
+    g.uFlatSky.value = 0;
+    g.uSkyBrightness.value = enabled ? 0 : 1;
+    g.uJetOn.value = enabled ? 0 : (this.tier.jets ? 1 : 0);
+    g.uDiskOpacity.value = enabled ? 0.02 : 0.85;
+    g.uDiskBrightness.value = 2.6;
+    this.historyDirty = true;
+  }
+
+  /** Override the disk scale height. Used by the thickness test. */
+  setScaleHeight(hr: number): void {
+    this.geodesic.material.uniforms.uDiskHR.value = hr;
     this.historyDirty = true;
   }
 
