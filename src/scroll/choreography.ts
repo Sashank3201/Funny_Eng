@@ -138,17 +138,43 @@ export function poseForProgress(progress: number): CameraState {
  * made the limb read as a wall of white against the right bezel.
  *
  * 1.06 is the measured value, not a guess. At 393×852 it puts the peak luminance
- * in the outermost columns at 0.35 on the left and 0.35 on the right — both equal
- * to the bare sky, which is what "the limb ends before the frame does" looks like
- * numerically. Anything below about 1.05 starts to clip the limb again.
+ * in the outermost columns at 0.34 on the left and 0.29 on the right — both at
+ * the bare sky, which is what "the limb ends before the frame does" looks like
+ * numerically. It is also close to the floor: dropping it to 0.94 to make the
+ * hole bigger put those columns at 0.83 and 0.55, cropping both limbs. The
+ * horizontal fit is the binding constraint on a phone and there is no slack in it.
+ *
+ * So the inclination opens instead, and this is what actually makes the narrow
+ * layout work. The desktop poses are near edge-on, which is right beside a column
+ * of type — the disk becomes a horizontal blade and the composition is a wide
+ * diagonal. Stacked in a tall frame that same blade is a thin bar with dead space
+ * above and below it. Tilting to about 16° opens the disk into an ellipse: the
+ * width is unchanged, so nothing new crops, but the height grows to fill the
+ * frame and the ring closes over and under the shadow. Same scene, turned to
+ * suit the aspect it is being shown in.
+ *
+ * The tilt is spent on the hero and given back immediately afterwards. That
+ * extra height is free over the hero, whose copy is all in the lower half, and
+ * costly everywhere else: the later sections are tall enough that their text
+ * reaches the upper third, and holding the open tilt through them put a section
+ * label at 3.42 against its 4.5 threshold. By the time the first section arrives
+ * the disk has closed back to the pose's own inclination, which is the thin blade
+ * that leaves the frame clear. Scrolling therefore shuts the disk like an
+ * aperture, which is a better transition than the constant tilt would have been.
  */
-export function adaptForNarrow(pose: CameraState, aspect: number): CameraState {
+export function adaptForNarrow(pose: CameraState, aspect: number, progress: number): CameraState {
   const fit = Math.min(2.2, Math.max(1, 1 / Math.max(aspect, 0.01))) * 1.06;
+
+  /** 1 on the hero, 0 once the first section is in view. */
+  const open = 1 - smoothstep((progress - 0.05) / 0.27);
+  const HERO_TILT = 0.28; // radians, ~16°
+
   return {
     ...pose,
     distance: pose.distance * fit,
+    elevation: lerp(pose.elevation, HERO_TILT, open),
     focusX: pose.focusX * 0.18,
-    focusY: pose.focusY * 0.3 + 0.44,
+    focusY: pose.focusY * 0.3 + lerp(0.44, 0.34, open),
   };
 }
 

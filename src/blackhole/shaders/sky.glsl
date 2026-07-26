@@ -64,6 +64,61 @@ vec3 starLayer(vec2 uv, float faceId, float cells, float density, float bright, 
 }
 
 /**
+ * Three bright stars, placed rather than hashed.
+ *
+ * The hashed layers are lensed too — every ray is — but the stars in them are
+ * sub-pixel pinpricks, so their arcs are thin and dark enough that the bending
+ * does not read. These three are put where the bending is strongest and made
+ * large and bright enough to survive it.
+ *
+ * They sit within a few degrees of the direction the hero pose looks *through*
+ * the hole, so their light reaches the camera the long way round — the shadow's
+ * angular radius from 33 Rs is about 4.4°, and a source this close to the axis
+ * has its image pulled into an arc hugging the photon ring, with a second,
+ * fainter image on the opposite side. None of that is drawn: it falls out of the
+ * integrator sampling this function with the ray's outgoing direction.
+ *
+ * The offsets are 1.5°, 3.5° and 7° at different position angles, so the three
+ * behave differently — the closest sweeps nearly all the way round, the furthest
+ * is a short smear. The camera's idle drift is a couple of degrees, the same
+ * order as the offsets, so the arcs breathe rather than sit still.
+ *
+ * They are far smaller than they look. `R` is about 0.08° — a fifth the width of
+ * the pinpricks in the hashed layers — because the magnification near the ring
+ * is enormous: at 0.57° these rendered as 80 px bands that swamped the frame.
+ * Arc *length* is set by the geometry and does not shrink with the source, so
+ * the size knob controls thickness only.
+ */
+/** Angular radius of a beacon, as a chord between unit vectors. About 0.08°. */
+const float BEACON_R = 0.0014;
+
+/** One beacon. `dir` must be normalised. */
+vec3 beacon(vec3 d, vec3 dir, float kelvin, float gain) {
+  // Chord length, which for unit vectors is the angular separation to within a
+  // part in 10^5 at these angles — and unlike acos it stays well-conditioned as
+  // the separation goes to zero, which is exactly where these live.
+  float s = length(d - dir);
+  float core = 1.0 - smoothstep(BEACON_R * 0.5, BEACON_R, s);
+  float halo = exp(-s / (BEACON_R * 2.4)) * 0.30;
+  return mix(vec3(1.0), blackbodyRGB(kelvin), 0.6) * (core + halo) * gain;
+}
+
+/*
+ * Written out rather than looped over an array on purpose. GLSL ES 1.00 does not
+ * guarantee dynamic indexing of a local array, and indexing one by the loop
+ * counter rendered correctly for several frames and then corrupted a whole
+ * rectangular region of the output. Three calls cost nothing and the behaviour
+ * is defined everywhere, which matters more here than usual — this ships to
+ * whatever driver the viewer's phone happens to have.
+ */
+vec3 beaconStars(vec3 d) {
+  vec3 acc = beacon(d, normalize(vec3( 0.018510, -0.118217, -0.992815)),  7600.0, 2.8);
+  acc += beacon(d, normalize(vec3(-0.060121, -0.089099, -0.994207)),  4900.0, 2.4);
+  acc += beacon(d, normalize(vec3( 0.078336, -0.006198, -0.996908)), 10500.0, 2.6);
+  return acc;
+}
+
+/**
  * Sky radiance arriving from direction `d`.
  * Galactic band with dust lanes, domain-warped nebulae, three star layers.
  */
@@ -109,6 +164,11 @@ vec3 skyRadiance(vec3 d) {
 
   // Large-scale extinction, which is what gives the field depth.
   col *= mix(0.35, 1.0, smoothstep(0.25, 0.75, fbm3(d * 1.1 + 60.0, 3)));
+
+  // Added after extinction. These are meant to be the brightest things in the
+  // sky at a known strength; letting a dust patch dim one by two thirds would
+  // decide whether its arc is visible at all.
+  col += beaconStars(d);
 
   // Faint cold floor so the frame is never pure black.
   col += vec3(0.005, 0.007, 0.016);

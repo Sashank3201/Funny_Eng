@@ -84,8 +84,11 @@ function boot(): void {
       window.scrollY > window.innerHeight * 0.35,
     );
 
-    let pose = poseForProgress(scrollProgress());
-    if (narrow()) pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight);
+    const progress = scrollProgress();
+    let pose = poseForProgress(progress);
+    if (narrow()) {
+      pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight, progress);
+    }
     renderer.setCamera(applyPointer(pose, pointer.x, pointer.y));
   };
 

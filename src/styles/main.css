@@ -371,7 +371,7 @@ main {
  */
 .section--hero {
   align-items: flex-end;
-  padding-bottom: clamp(5rem, 13vh, 9rem);
+  padding-bottom: clamp(4rem, 11vh, 7.5rem);
 }
 
 .section--hero .section__inner {
@@ -766,8 +766,53 @@ main {
 /* ============================================================ responsive == */
 
 @media (max-width: 900px) {
-  /* Narrow screens stack copy under the hole, so the veil runs vertically. */
+  /*
+   * Narrow screens stack copy under the hole, so the veil runs vertically — and
+   * on the hero, where the copy is all in the lower half, it can leave the top
+   * alone entirely.
+   *
+   * The old single gradient reached 0.70 by 22 % of the height, which is exactly
+   * where `adaptForNarrow` puts the hole. Edge-on that survived, because the disk
+   * was a narrow blade bright enough to punch through it; opened up to 14° it did
+   * not, and the render went grey and hazy.
+   *
+   * But it cannot simply be lightened, because the veil is fixed to the viewport
+   * and the later sections are tall enough that their copy does reach the upper
+   * third — lightening it across the board dropped five runs below threshold, the
+   * worst to 1.29. So there are two veils, cross-faded on the same `is-scrolled`
+   * flag the readout already uses: clear over the hero, protective past it.
+   *
+   * Cross-faded rather than swapped. Two dark washes stacked would compound into
+   * something darker than either, and a hard switch would flash mid-scroll.
+   */
   .veil {
+    background: none;
+  }
+
+  .veil::before,
+  .veil::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transition: opacity 0.5s var(--ease);
+  }
+
+  /* Hero: nearly clear over the hole, all the darkening where the copy starts. */
+  .veil::before {
+    opacity: 1;
+    background: linear-gradient(
+      to bottom,
+      rgba(4, 5, 10, 0.10) 0%,
+      rgba(4, 5, 10, 0.16) 34%,
+      rgba(4, 5, 10, 0.72) 52%,
+      rgba(4, 5, 10, 0.92) 68%,
+      rgba(4, 5, 10, 0.95) 100%
+    );
+  }
+
+  /* Past the hero: the original full-height protection. */
+  .veil::after {
+    opacity: 0;
     background: linear-gradient(
       to bottom,
       rgba(4, 5, 10, 0.32) 0%,
@@ -775,6 +820,14 @@ main {
       rgba(4, 5, 10, 0.88) 46%,
       rgba(4, 5, 10, 0.94) 100%
     );
+  }
+
+  .is-scrolled .veil::before {
+    opacity: 0;
+  }
+
+  .is-scrolled .veil::after {
+    opacity: 1;
   }
 
   /*
