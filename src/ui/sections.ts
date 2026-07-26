@@ -204,20 +204,14 @@ export function renderChrome(root: ParentNode): void {
     else status.remove();
   }
 
-  const nav = root.querySelector('[data-nav]');
-  if (nav) {
-    const items: [string, string][] = [
-      ['Work', '#work'],
-      ['About', '#about'],
-      ['Contact', '#contact'],
-    ];
-    nav.replaceChildren(
-      ...items.map(([label, href]) => {
-        const a = el('a', 'nav__link', label);
-        a.href = href;
-        return a;
-      }),
-    );
+  // The nav links, the sheet and the orbit dial are built together in
+  // `ui/nav.ts`, because the dial's geometry and the links' targets both come
+  // from KEYFRAMES and splitting them invites the two to disagree.
+
+  const sheetStatus = root.querySelector('[data-sheet-status]');
+  if (sheetStatus) {
+    if (content.availability) sheetStatus.textContent = content.availability;
+    else sheetStatus.remove();
   }
 
   const readout = root.querySelector('[data-readout]');

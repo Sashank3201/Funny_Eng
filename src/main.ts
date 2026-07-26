@@ -4,6 +4,7 @@ import { GeodesicRenderer } from './blackhole/GeodesicRenderer';
 import type { TierName } from './blackhole/quality';
 import { content } from './content';
 import { adaptForNarrow, applyPointer, poseForProgress } from './scroll/choreography';
+import { activeSection, mountNav, updateNav } from './ui/nav';
 import { observeReveals, renderChrome, renderSections } from './ui/sections';
 
 function supportsWebGL(): boolean {
@@ -45,6 +46,7 @@ function boot(): void {
 
   applyMeta();
   renderChrome(document);
+  mountNav(document);
   renderSections(contentRoot);
   observeReveals();
 
@@ -90,6 +92,10 @@ function boot(): void {
     let pose = poseForProgress(scrollProgress());
     if (narrow()) pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight);
     renderer.setCamera(applyPointer(pose, pointer.x, pointer.y));
+
+    // The dial reads the same pose the renderer was just handed, so the marker
+    // and the camera cannot drift apart.
+    updateNav(pose.azimuth, activeSection());
   };
 
   syncCamera();

@@ -180,6 +180,76 @@ body {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
 }
 
+/*
+ * The orbit dial.
+ *
+ * A plan view of the camera's own orbit, seen down the spin axis. The faint
+ * circle is the full orbit, the brighter arc is the ~200° this page actually
+ * travels, the dots are the four section poses and the amber marker is where the
+ * camera is at this scroll position. It stands in for a logo because it is the
+ * one mark that could only belong to this page.
+ */
+.orbit {
+  display: block;
+  width: 1.45rem;
+  height: 1.45rem;
+  flex: none;
+  border-radius: 50%;
+  color: var(--ember);
+}
+
+.orbit__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.orbit__path {
+  fill: none;
+  stroke: rgba(242, 239, 233, 0.20);
+  stroke-width: 0.7;
+}
+
+.orbit__arc {
+  fill: none;
+  stroke: rgba(242, 239, 233, 0.55);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+}
+
+.orbit__photon {
+  fill: none;
+  stroke: rgba(255, 178, 107, 0.55);
+  stroke-width: 0.55;
+}
+
+.orbit__shadow {
+  fill: #05050a;
+}
+
+.orbit__station {
+  fill: rgba(242, 239, 233, 0.5);
+}
+
+.orbit__marker {
+  fill: var(--ember);
+  transition: cx 0.45s var(--ease), cy 0.45s var(--ease);
+}
+
+/* Previewing a link is a jump to somewhere else on the orbit, not the camera
+   moving, so it lands immediately rather than easing like the camera does. */
+.orbit.is-previewing .orbit__marker {
+  transition: none;
+}
+
+.orbit:hover .orbit__photon,
+.orbit:focus-visible .orbit__photon {
+  stroke: var(--ember);
+}
+
+/* The name only appears once the hero's own 136 px wordmark has left the screen.
+   Before that the two would be the same word twice on one view. */
 .chrome__mark {
   font-family: var(--mono);
   font-size: 0.7rem;
@@ -188,6 +258,14 @@ body {
   text-transform: uppercase;
   color: var(--ink);
   text-decoration: none;
+  opacity: 0;
+  transform: translateX(-0.4rem);
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
+}
+
+.is-scrolled .chrome__mark {
+  opacity: 1;
+  transform: none;
 }
 
 .chrome__left {
@@ -262,6 +340,28 @@ body {
 .nav__link:hover,
 .nav__link:focus-visible {
   color: var(--ember);
+}
+
+/* Active state. The page previously had none — three links and no indication of
+   where you were. The underline is drawn from the mono baseline rather than as a
+   box, to stay in the instrument language the chrome already speaks. */
+.nav__link.is-active {
+  color: var(--ink);
+}
+
+.nav__link.is-active::after {
+  content: '';
+  display: block;
+  height: 1px;
+  margin-top: 0.32rem;
+  background: var(--ember);
+}
+
+/* The sheet toggle and the sheet itself are the narrow-screen arrangement; both
+   are hidden until the media query below turns them on. */
+.navtoggle,
+.sheet {
+  display: none;
 }
 
 /* The instrument readout — states what the renderer is actually doing. It
@@ -852,6 +952,95 @@ main {
       rgba(4, 5, 10, 0.55) 85%,
       transparent 100%
     );
+  }
+
+  /*
+   * The ring stays; the links move into a sheet.
+   *
+   * At 393 px the ring, three links and the availability line cannot share a row
+   * without shrinking all of them past legibility. The ring is the element worth
+   * keeping on the screen people actually use, so the links get a sheet — and a
+   * solid panel is the right answer for a temporary overlay in a way it never
+   * was for persistent chrome, because it takes the live render out of the
+   * contrast problem completely.
+   */
+  .chrome__nav {
+    display: none;
+  }
+
+  .navtoggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0;
+    border: 0;
+    background: none;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
+    cursor: pointer;
+  }
+
+  .navtoggle[aria-expanded='true'] {
+    color: var(--ember);
+  }
+
+  /* Below the header, not above it: the toggle has to stay reachable to close
+     the sheet again. */
+  .sheet {
+    position: fixed;
+    z-index: 6;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.4rem;
+    padding: 0 var(--gutter);
+    /* Fully opaque. At 0.985 the hero copy ghosted through behind the links,
+       which reads as a rendering fault rather than as depth. */
+    background: var(--void);
+  }
+
+  .chrome {
+    z-index: 7;
+  }
+
+  .sheet__nav {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Author styles outrank the UA rule for [hidden], so without this the sheet
+     stays on screen after being closed. */
+  .sheet[hidden] {
+    display: none;
+  }
+
+  .sheet__link {
+    display: block;
+    padding: 0.7rem 0;
+    font-family: var(--headline);
+    font-size: 2.4rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .sheet__link.is-active {
+    color: var(--ember);
+  }
+
+  .sheet__status {
+    margin: 1.6rem 0 0;
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ember);
   }
 
   /* Fixed to the corner, it lands on top of the copy once the sections get

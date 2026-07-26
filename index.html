@@ -21,11 +21,35 @@
 
     <header class="chrome">
       <div class="chrome__left">
-        <a class="chrome__mark" href="#hero" data-mark></a>
+        <!-- The orbit glyph is the mark. Scrolling this page really is an orbit —
+             3.5 radians of azimuth from the hero to the contact section — so the
+             marker on this ring is the camera's actual position, not an
+             ornament. The name only appears once the hero's own wordmark has
+             scrolled away, so the two never sit on screen together. -->
+        <a class="orbit" href="#hero" data-orbit></a>
+        <span class="chrome__mark" data-mark></span>
         <span class="status" data-status></span>
       </div>
       <nav class="chrome__nav" data-nav aria-label="Sections"></nav>
+      <button
+        class="navtoggle"
+        type="button"
+        data-navtoggle
+        aria-expanded="false"
+        aria-controls="nav-sheet"
+      >
+        <span class="navtoggle__label">Menu</span>
+      </button>
     </header>
+
+    <!-- Narrow screens cannot hold the ring, three links and the availability
+         line on one row, so the links move in here. A solid panel is the right
+         answer for a temporary overlay in a way it never was for persistent
+         chrome: it sidesteps the live render entirely. -->
+    <div class="sheet" id="nav-sheet" data-sheet hidden>
+      <nav class="sheet__nav" data-sheet-nav aria-label="Sections"></nav>
+      <p class="sheet__status" data-sheet-status></p>
+    </div>
 
     <!-- Live annotation of what the simulation is actually integrating. -->
     <aside class="readout" data-readout aria-hidden="true"></aside>

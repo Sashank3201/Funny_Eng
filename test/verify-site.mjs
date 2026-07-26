@@ -20,7 +20,9 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
   await page.goto(BASE, { waitUntil: 'load' });
   await page.waitForTimeout(13000);
   await page.screenshot({ path: `${OUT}/v3-mobile-hero.png` });
-  await page.evaluate(() => document.getElementById('work').scrollIntoView());
+  await page.evaluate(() =>
+    document.getElementById('work').scrollIntoView({ behavior: 'instant', block: 'start' }),
+  );
   await page.waitForTimeout(8000);
   await page.screenshot({ path: `${OUT}/v3-mobile-work.png` });
   const m = await page.evaluate(() => ({
@@ -105,7 +107,20 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
 
   const worst = [];
   for (const id of ['hero', 'work', 'about', 'contact']) {
-    await page.evaluate((s) => document.getElementById(s).scrollIntoView(), id);
+    // `behavior: 'instant'` is load-bearing, not tidiness. The page sets
+    // `scroll-behavior: smooth`, and under SwiftShader the main thread is busy
+    // enough marching geodesics that the smooth-scroll animation never advances:
+    // `scrollTo` returned with `scrollY` still 0. Every section therefore
+    // measured the hero, which is why the 136 px hero wordmark kept turning up
+    // in the "work" results. The assertion below is what stops that recurring.
+    const landed = await page.evaluate((s) => {
+      document.getElementById(s).scrollIntoView({ behavior: 'instant', block: 'start' });
+      return window.scrollY;
+    }, id);
+    const wanted = await page.evaluate((s) => document.getElementById(s).offsetTop, id);
+    if (id !== 'hero' && Math.abs(landed - wanted) > 4 && landed < wanted) {
+      throw new Error(`scroll to #${id} did not land: scrollY=${landed}, wanted ${wanted}`);
+    }
     await page.waitForTimeout(8000);
 
     const boxes = await page.evaluate(() => {
