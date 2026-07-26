@@ -6,6 +6,7 @@ precision highp float;
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
 uniform sampler2D uStreak;
+uniform sampler2D uBase;
 uniform float uBloomIntensity;
 uniform float uStreakIntensity;
 uniform float uHalation;
@@ -18,6 +19,7 @@ uniform float uContrast;
 uniform float uSaturation;
 uniform float uKneeThreshold;
 uniform float uKneeStrength;
+uniform float uDetail;
 uniform vec3 uShadowTint;
 uniform vec3 uHighlightTint;
 
@@ -49,12 +51,51 @@ varying vec2 vUv;
  * This is a display mapping. It changes nothing about the g⁴ physics that
  * produced the range.
  */
-vec3 highlightShoulder(vec3 c) {
-  float l = max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-5);
-  if (l <= uKneeThreshold) return c;
+float shoulder(float l) {
+  if (l <= uKneeThreshold) return l;
+  return uKneeThreshold + uKneeStrength * log(1.0 + (l - uKneeThreshold) / uKneeStrength);
+}
 
-  float over = l - uKneeThreshold;
-  float mapped = uKneeThreshold + uKneeStrength * log(1.0 + over / uKneeStrength);
+/**
+ * Local tone mapping.
+ *
+ * The shoulder above is global, and a global curve cannot solve this. Measured
+ * through the whole chain, a 2:1 change in scene value separates by 0.116 on the
+ * receding limb, where values sit near 0.5, and by 0.011 on the approaching limb
+ * at 40–80. Retuning the curve moves that second number to 0.015 at best: past
+ * the knee, ACES is nearly flat, so *any* monotone mapping that fits the 80:1
+ * beaming ratio on screen throws away the texture inside the bright side. That
+ * is why the approaching limb read as white paint while the receding one kept
+ * its filaments.
+ *
+ * So the low frequencies and the high frequencies are mapped separately. A
+ * blurred copy of the scene gives the local average; the ratio of the pixel to
+ * that average is the local structure. The average is compressed hard, the ratio
+ * is put back nearly intact, and detail survives compression that would
+ * otherwise flatten it. This is how eyes work — adaptation is local, not global.
+ *
+ * The ratio is clamped because the alternative is ringing: at the shadow's edge
+ * the local average is meaningless and an unbounded ratio paints a bright halo
+ * along it.
+ */
+vec3 localTonemap(vec3 c, float baseLum) {
+  float l = max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-5);
+  float base = max(baseLum, 1e-4);
+
+  // `shoulder(l)`, not `shoulder(base)`. Compressing the base and multiplying
+  // the ratio back is textbook local tone mapping, and it is wrong here: it
+  // normalises every region to its own local average, which flattens the very
+  // thing that makes this image — the 80:1 beaming between the limbs. Tried it,
+  // and the disk turned into one even cream-coloured ring with the receding
+  // side's amber gone.
+  //
+  // Compressing the pixel globally keeps that relationship exactly as it was,
+  // and the base is used only to recover the high-frequency part the compression
+  // flattens. Where the scene is locally flat the ratio is 1 and this reduces to
+  // the plain global curve.
+  float detail = clamp(l / base, 0.3, 3.0);
+  float mapped = shoulder(l) * pow(detail, uDetail);
+
   return c * (mapped / l);
 }
 
@@ -101,7 +142,15 @@ void main() {
   // rather than as more disk.
   col += texture2D(uStreak, vUv).rgb * vec3(0.55, 0.75, 1.0) * uStreakIntensity;
 
-  col = acesFilm(highlightShoulder(col * uExposure));
+  // The base layer is the blurred scene, so it takes the same exposure as the
+  // scene does before the two are compared.
+  vec3 baseCol = texture2D(uBase, vUv).rgb * uExposure;
+  float baseLum = dot(baseCol, vec3(0.2126, 0.7152, 0.0722));
+
+  // Glare is added before tone mapping so it is compressed along with
+  // everything else, but it must not pollute the base layer — the base is what
+  // the scene's own low frequencies are, not what the glare made of them.
+  col = acesFilm(localTonemap(col * uExposure, baseLum));
 
   // Filmic S-curve.
   col = mix(col, col * col * (3.0 - 2.0 * col), uContrast);

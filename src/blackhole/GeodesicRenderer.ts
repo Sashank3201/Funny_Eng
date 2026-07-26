@@ -92,6 +92,8 @@ export class GeodesicRenderer {
   private rtHistory!: [WebGLRenderTarget, WebGLRenderTarget];
   private historyIndex = 0;
   private bloomMips: WebGLRenderTarget[] = [];
+  /** Blurred scene luminance, the base layer for local tone mapping. */
+  private baseMips: WebGLRenderTarget[] = [];
   private rtStreak!: WebGLRenderTarget;
 
   private tier: Tier;
@@ -168,7 +170,7 @@ export class GeodesicRenderer {
       // How hard one source is allowed to drive the glare. The beamed limb
       // reaches tens of times this; everything past it is compressed
       // logarithmically rather than fed to the blur at full strength.
-      uBloomClamp: { value: 0.22 },
+      uBloomClamp: { value: 0.10 },
     });
 
     this.downsample = new FullscreenPass(downsampleFrag, {
@@ -196,10 +198,11 @@ export class GeodesicRenderer {
       uScene: { value: null },
       uBloom: { value: null },
       uStreak: { value: null },
+      uBase: { value: null },
       uBloomIntensity: { value: 0.22 },
       uStreakIntensity: { value: 0.04 },
       uHalation: { value: 0.07 },
-      uExposure: { value: 1.12 },
+      uExposure: { value: 1.02 },
       uTime: { value: 0 },
       uAberration: { value: 0.008 },
       uGrain: { value: 0.012 },
@@ -208,6 +211,9 @@ export class GeodesicRenderer {
       uSaturation: { value: 1.22 },
       uKneeThreshold: { value: 0.50 },
       uKneeStrength: { value: 0.32 },
+      // How much of the local structure survives the compression. 1.0 is full
+      // detail and rings at edges; 0 collapses to the plain global curve.
+      uDetail: { value: 0.50 },
       uShadowTint: { value: new Color(0.9, 0.95, 1.07) },
       uHighlightTint: { value: new Color(1.06, 0.99, 0.92) },
     });
@@ -390,6 +396,18 @@ export class GeodesicRenderer {
       mip.setSize(mw, mh);
     }
 
+    if (this.baseMips.length !== 3) {
+      for (const mip of this.baseMips) mip.dispose();
+      this.baseMips = Array.from({ length: 3 }, () => new WebGLRenderTarget(1, 1, this.targetOptions()));
+    }
+    let bw = rw;
+    let bh = rh;
+    for (const mip of this.baseMips) {
+      bw = Math.max(2, Math.floor(bw / 2));
+      bh = Math.max(2, Math.floor(bh / 2));
+      mip.setSize(bw, bh);
+    }
+
     this.rtStreak.setSize(Math.max(2, Math.floor(rw / 4)), Math.max(2, Math.floor(rh / 4)));
     (this.geodesic.material.uniforms.uResolution.value as Vector2).set(rw, rh);
   }
@@ -480,8 +498,33 @@ export class GeodesicRenderer {
     this.camUp.crossVectors(this.camRight, this.camFwd).normalize();
   }
 
+  /**
+   * Low-frequency luminance of the scene, for the local tone mapping.
+   *
+   * This cannot reuse the bloom pyramid. That chain is seeded from the bright
+   * pass, which both thresholds and — since the glare fix — log-compresses its
+   * input, so its magnitudes no longer stand for the scene's. The base layer has
+   * to be an honest average or the detail ratio built from it is meaningless.
+   *
+   * Three halvings off the march resolution is plenty: what matters is that the
+   * radius is wide compared to the disk's filaments and narrow compared to the
+   * limb itself.
+   */
+  private renderBase(source: WebGLRenderTarget): void {
+    const down = this.downsample.material.uniforms;
+    let src: WebGLRenderTarget = source;
+    for (const target of this.baseMips) {
+      down.uScene.value = src.texture;
+      (down.uTexel.value as Vector2).set(1 / src.width, 1 / src.height);
+      this.downsample.render(this.renderer, target);
+      src = target;
+    }
+  }
+
   private renderBloom(source: WebGLRenderTarget): void {
     const mips = this.bloomMips;
+
+    this.renderBase(source);
 
     this.bright.material.uniforms.uScene.value = source.texture;
     this.bright.render(this.renderer, mips[0]);
@@ -559,6 +602,7 @@ export class GeodesicRenderer {
     comp.uScene.value = target.texture;
     comp.uBloom.value = this.bloomMips[0].texture;
     comp.uStreak.value = this.rtStreak.texture;
+    comp.uBase.value = this.baseMips[this.baseMips.length - 1].texture;
     comp.uTime.value = this.simTime;
     this.composite.render(this.renderer, null);
 
@@ -637,6 +681,10 @@ export class GeodesicRenderer {
     // without a line of the integrator changing.
     c.uKneeThreshold.value = 1e6;
     c.uSaturation.value = 1;
+    // The local-detail term multiplies each pixel by its ratio to a blurred
+    // copy, which is strongest exactly at the shadow's edge — precisely the
+    // 50 % luminance crossing this test measures.
+    c.uDetail.value = 0;
     this.historyDirty = true;
   }
 
@@ -688,6 +736,7 @@ export class GeodesicRenderer {
     c.uContrast.value = 0;
     c.uSaturation.value = 1;
     c.uKneeThreshold.value = 1e6; // bypass the shoulder entirely
+    c.uDetail.value = 0;
     c.uExposure.value = 1;
 
     g.uFlatSky.value = 0;
