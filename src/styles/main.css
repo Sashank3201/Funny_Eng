@@ -154,10 +154,26 @@ body {
   left: 0;
   right: 0;
   display: flex;
+  /* The header is fixed over a scene that moves under it, so unlike the body
+     copy it cannot be composed around. A soft top-down falloff — no edge, no
+     box — guarantees it ground wherever the disk drifts. */
+  background: linear-gradient(
+    to bottom,
+    rgba(4, 5, 10, 0.88) 0%,
+    rgba(4, 5, 10, 0.5) 55%,
+    transparent 100%
+  );
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
   padding: clamp(1rem, 2.5vw, 1.9rem) var(--gutter);
+}
+
+.chrome__mark,
+.nav__link,
+.status,
+.readout {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.9);
 }
 
 .chrome__mark {
@@ -234,7 +250,7 @@ body {
   font-size: 0.68rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--ink-dim);
   text-decoration: none;
   transition: color 0.3s var(--ease);
 }
@@ -434,7 +450,7 @@ main {
 /* ================================================================== work == */
 
 .projects {
-  max-width: 58rem;
+  max-width: 46rem;
   display: grid;
   border-top: 1px solid var(--rule);
 }
@@ -684,11 +700,19 @@ main {
   .veil {
     background: linear-gradient(
       to bottom,
-      transparent 0%,
-      rgba(4, 5, 10, 0.32) 28%,
-      rgba(4, 5, 10, 0.82) 52%,
-      rgba(4, 5, 10, 0.93) 100%
+      rgba(4, 5, 10, 0.32) 0%,
+      rgba(4, 5, 10, 0.62) 22%,
+      rgba(4, 5, 10, 0.88) 46%,
+      rgba(4, 5, 10, 0.94) 100%
     );
+  }
+
+  /* Fixed to the corner, it lands on top of the copy once the sections get
+     tall. In the flow it cannot collide with anything. */
+  .placeholder-notice {
+    position: static;
+    max-width: none;
+    margin: 0 var(--gutter) calc(var(--gutter) + 1rem);
   }
 
   .section {

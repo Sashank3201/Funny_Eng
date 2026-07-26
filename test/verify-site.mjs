@@ -77,7 +77,8 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
 // ---- 4. Measured contrast of every text run against the LIVE render --------
 // Sample the actual rendered pixels behind each element, not an assumed colour.
 {
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  for (const vp of [{ width: 1440, height: 900, label: 'desktop' }, { width: 393, height: 852, label: 'mobile' }]) {
+  const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1, isMobile: vp.label === 'mobile', hasTouch: vp.label === 'mobile' });
   const page = await ctx.newPage();
   await page.goto(BASE + '?tier=high', { waitUntil: 'load' });
   await page.waitForTimeout(12000);
@@ -157,13 +158,14 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
   }
   const fails = worst.filter((w) => !w.pass).sort((a, b) => a.ratio - b.ratio);
   out.push({
-    case: 'contrast',
+    case: `contrast-${vp.label}`,
     runsChecked: worst.length,
     failures: fails.length,
     worstFive: fails.slice(0, 5),
     minRatio: +Math.min(...worst.map((w) => w.ratio)).toFixed(2),
   });
   await ctx.close();
+  }
 }
 
 console.log(JSON.stringify(out, null, 2));

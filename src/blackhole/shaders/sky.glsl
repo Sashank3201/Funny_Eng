@@ -55,7 +55,7 @@ vec3 starLayer(vec2 uv, float faceId, float cells, float density, float bright, 
       if (spikes > 0.0 && m3 > 0.5) {
         float sx = exp(-abs(sp.x) * 170.0) * exp(-abs(sp.y) * 8.0);
         float sy = exp(-abs(sp.y) * 170.0) * exp(-abs(sp.x) * 8.0);
-        v += (sx + sy) * m3 * spikes * 0.55;
+        v += (sx + sy) * m3 * spikes * 0.75;
       }
       acc += tint * v * bright;
     }
@@ -75,9 +75,9 @@ vec3 skyRadiance(vec3 d) {
   float faceId = face.x * 1.0 + face.y * 2.0 + face.z * 3.0;
 
   vec3 col = vec3(0.0);
-  col += starLayer(uv, faceId, 11.0, 0.22, 0.95, 1.0);
-  col += starLayer(uv, faceId + 11.0, 21.0, 0.16, 0.42, 0.0);
-  col += starLayer(uv, faceId + 23.0, 38.0, 0.11, 0.18, 0.0);
+  col += starLayer(uv, faceId, 11.0, 0.24, 1.45, 1.0);
+  col += starLayer(uv, faceId + 11.0, 21.0, 0.18, 0.66, 0.0);
+  col += starLayer(uv, faceId + 23.0, 38.0, 0.13, 0.30, 0.0);
 
   // Galactic band — a great circle tilted off the disk plane so it reads as an
   // independent structure rather than an echo of the accretion disk.
@@ -95,14 +95,14 @@ vec3 skyRadiance(vec3 d) {
   float bandTex = clouds * (1.0 - dust * 0.85);
 
   vec3 bandCol = mix(vec3(0.30, 0.33, 0.42), vec3(0.46, 0.38, 0.31), clouds);
-  col += bandCol * band * bandTex * 0.34;
+  col += bandCol * band * bandTex * 0.17;
 
   // Unresolved star haze concentrated in the band.
-  col += vec3(0.7, 0.74, 0.85) * band * pow(fbm3(d * 46.0, 2), 4.0) * 1.6;
+  col += vec3(0.7, 0.74, 0.85) * band * pow(fbm3(d * 46.0, 2), 4.0) * 2.2;
 
   // Nebulae, region-masked so they live somewhere rather than everywhere.
   float nebMask = smoothstep(0.42, 0.80, fbm3(d * 1.5 + 30.0, 3));
-  float neb = pow(max(clouds - 0.36, 0.0), 1.7) * 2.4 * nebMask;
+  float neb = pow(max(clouds - 0.36, 0.0), 1.7) * 1.15 * nebMask;
   vec3 nebCol = mix(vec3(0.09, 0.08, 0.26), vec3(0.38, 0.12, 0.24), clamp(q.x * 1.6, 0.0, 1.0));
   nebCol = mix(nebCol, vec3(0.32, 0.18, 0.09), clamp(q.y * 1.3, 0.0, 1.0) * 0.5);
   col += nebCol * neb;

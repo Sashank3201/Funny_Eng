@@ -33,8 +33,8 @@ export interface Tier {
 export const TIERS: Record<TierName, Tier> = {
   high: {
     name: 'high',
-    rayScale: 0.75,
-    maxSteps: 256,
+    rayScale: 0.90,
+    maxSteps: 320,
     maxStepAngle: 0.07,
     bloomLevels: 5,
     maxPixelRatio: 1.75,
@@ -42,8 +42,8 @@ export const TIERS: Record<TierName, Tier> = {
   },
   medium: {
     name: 'medium',
-    rayScale: 0.55,
-    maxSteps: 160,
+    rayScale: 0.68,
+    maxSteps: 200,
     maxStepAngle: 0.10,
     bloomLevels: 4,
     maxPixelRatio: 1.5,
@@ -51,8 +51,8 @@ export const TIERS: Record<TierName, Tier> = {
   },
   low: {
     name: 'low',
-    rayScale: 0.40,
-    maxSteps: 96,
+    rayScale: 0.50,
+    maxSteps: 120,
     maxStepAngle: 0.15,
     bloomLevels: 3,
     maxPixelRatio: 1.25,

@@ -512,7 +512,11 @@ export class GeodesicRenderer {
 
     let blend = 1;
     if (!this.reducedMotion && !this.historyDirty) {
-      const base = Math.min(0.85, TAA_BLEND + this.camSpeed * 2.2);
+      // Distance is constant across the page now, so the camera moves less and
+      // the history stays valid longer. Holding the blend lower trades a
+      // little ghosting for a much steadier picture mid-scroll, which is
+      // exactly when the noise was most visible.
+      const base = Math.min(0.55, TAA_BLEND + this.camSpeed * 1.2);
       blend = 1 - Math.pow(1 - base, Math.max(dt, 1e-4) * 60);
     }
     this.historyDirty = false;

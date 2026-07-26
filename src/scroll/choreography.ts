@@ -23,11 +23,18 @@ export interface Keyframe extends CameraState {
  * `focusX`/`focusY` place the hole in NDC: positive X is right of centre,
  * positive Y is above. Elevation near zero is near edge-on, which is where the
  * lensed secondary image reads most clearly.
+ *
+ * The rule every pose obeys: the *core* — shadow, photon ring and the secondary
+ * arcs, roughly 280 px across at distance 30 on a 900 px-tall viewport — is
+ * fully on screen and clear of the copy. Only the dim outer disk is allowed to
+ * crop at the frame edge. On a 1440-wide viewport that puts focusX in roughly
+ * [0.52, 0.61]: below it the core slides under the text, above it the shadow
+ * clips off the right edge.
  */
 export const KEYFRAMES: Keyframe[] = [
   {
-    // Hero — hole right of centre, copy on the left, near edge-on for the
-    // full Einstein-ring silhouette.
+    // Hero — the reference pose. Near edge-on, which is what produces the
+    // Einstein-ring silhouette with the disk arcing over *and* under.
     id: 'hero',
     distance: 30,
     azimuth: 0,
@@ -36,36 +43,35 @@ export const KEYFRAMES: Keyframe[] = [
     focusY: 0.02,
   },
   {
-    // Work — pull back and drop the hole low and right, clearing the upper
-    // two-thirds for project cards.
+    // Work — same distance, so it stays the same size. Tilted a little further
+    // open than the hero for variety, and lifted slightly so the project rows
+    // run under the disk rather than through the core.
     id: 'work',
-    distance: 64,
-    azimuth: 0.55,
-    elevation: 0.32,
-    focusX: 0.82,
-    focusY: -0.72,
+    distance: 30,
+    azimuth: 1.15,
+    elevation: 0.165,
+    focusX: 0.56,
+    focusY: 0.10,
   },
   {
-    // About — swing round to the far side and tilt toward edge-on, so the disk
-    // becomes a thin bright line. Kept right of centre like every other pose:
-    // the copy column and the veil both run down the left, so the hole has to
-    // stay out of that lane or the text loses its ground.
+    // About — the thinnest inclination on the page. Almost perfectly edge-on,
+    // so the disk collapses to a blade of light through the photon ring.
     id: 'about',
-    distance: 50,
-    azimuth: 1.5,
+    distance: 29,
+    azimuth: 2.35,
     elevation: 0.045,
-    focusX: 0.74,
-    focusY: -0.46,
+    focusX: 0.56,
+    focusY: -0.14,
   },
   {
-    // Contact — push in close and centre it. Little copy here, so the
-    // simulation can dominate.
+    // Contact — closest, and the only pose where the hole is allowed to
+    // dominate, because there is barely any copy here to protect.
     id: 'contact',
-    distance: 28,
-    azimuth: 2.4,
-    elevation: 0.20,
-    focusX: 0.68,
-    focusY: -0.34,
+    distance: 26,
+    azimuth: 3.5,
+    elevation: 0.125,
+    focusX: 0.50,
+    focusY: -0.22,
   },
 ];
 
