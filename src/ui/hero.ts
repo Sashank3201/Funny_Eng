@@ -17,7 +17,9 @@ export function renderHeroContent(root: ParentNode): void {
     actions.replaceChildren(
       ...content.actions.map((action) => {
         const a = document.createElement('a');
-        a.className = action.primary ? 'btn btn--primary' : 'btn';
+        a.className = action.primary
+          ? 'btn btn--primary glass glass--pill'
+          : 'btn glass glass--pill';
         a.href = action.href;
         a.textContent = action.label;
         return a;
@@ -54,13 +56,26 @@ export function bindPointer(
   target: HTMLElement,
   onMove: (x: number, y: number) => void,
 ): PointerBinding {
-  const handleMove = (event: PointerEvent) => {
-    const x = (event.clientX / window.innerWidth) * 2 - 1;
-    const y = (event.clientY / window.innerHeight) * 2 - 1;
-    onMove(x, -y);
+  const root = document.documentElement;
+
+  /** Drive the glass sheen from the same pointer that drives the camera, so
+   *  the specular highlight and the scene agree on where the light is. */
+  const setSheen = (px: number, py: number) => {
+    root.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`);
+    root.style.setProperty('--my', `${(py * 100).toFixed(1)}%`);
   };
 
-  const handleLeave = () => onMove(0, 0);
+  const handleMove = (event: PointerEvent) => {
+    const px = event.clientX / window.innerWidth;
+    const py = event.clientY / window.innerHeight;
+    setSheen(px, py);
+    onMove(px * 2 - 1, -(py * 2 - 1));
+  };
+
+  const handleLeave = () => {
+    setSheen(0.5, 0);
+    onMove(0, 0);
+  };
 
   target.addEventListener('pointermove', handleMove, { passive: true });
   target.addEventListener('pointerleave', handleLeave);

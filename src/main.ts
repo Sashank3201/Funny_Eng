@@ -1,6 +1,8 @@
 import './styles/main.css';
+import './styles/glass.css';
 
 import { BlackHoleRenderer } from './blackhole/Renderer';
+import { detectTier } from './blackhole/quality';
 import { bindPointer, renderHeroContent, revealHero } from './ui/hero';
 
 function supportsWebGL(): boolean {
@@ -16,6 +18,18 @@ function supportsWebGL(): boolean {
   }
 }
 
+/**
+ * `backdrop-filter` over a live WebGL canvas forces the compositor to re-read
+ * the canvas every frame, which is expensive enough on weaker hardware to cost
+ * real frames. The glass surfaces keep their geometry either way — only the
+ * blur is dropped.
+ */
+function enableGlass(): boolean {
+  if (!detectTier().glass) return false;
+  // A touch device that passed the tier check is still usually a phone.
+  return !window.matchMedia('(pointer: coarse)').matches;
+}
+
 function boot(): void {
   const hero = document.querySelector<HTMLElement>('.hero');
   const canvas = document.querySelector<HTMLCanvasElement>('#scene');
@@ -23,6 +37,8 @@ function boot(): void {
 
   renderHeroContent(document);
   revealHero(hero);
+
+  if (enableGlass()) document.documentElement.classList.add('has-glass');
 
   if (!supportsWebGL()) {
     // The CSS poster behind the canvas is already visible; just make sure the

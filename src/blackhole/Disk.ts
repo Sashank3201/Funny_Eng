@@ -1,41 +1,64 @@
 import {
   AdditiveBlending,
   BufferAttribute,
-  BufferGeometry,
-  Points,
+  InstancedBufferAttribute,
+  InstancedBufferGeometry,
+  Mesh,
   ShaderMaterial,
   Sphere,
+  Vector2,
   Vector3,
 } from 'three';
 
 import { DISK_OUTER, glslPhysicsDefines } from './physics';
 import diskVert from './shaders/disk.vert.glsl?raw';
 import diskFrag from './shaders/disk.frag.glsl?raw';
+import lensingChunk from './shaders/lensing.glsl?raw';
+import streakChunk from './shaders/streak.glsl?raw';
+
+/** A unit quad in -0.5..0.5, shared by every particle instance. */
+function quadAttributes(geometry: InstancedBufferGeometry): void {
+  geometry.setAttribute(
+    'aCorner',
+    new BufferAttribute(
+      new Float32Array([-0.5, -0.5, 0.5, -0.5, 0.5, 0.5, -0.5, 0.5]),
+      2,
+    ),
+  );
+  // `position` is never read by the shader, but three uses it to size the draw
+  // and to build the bounding sphere.
+  geometry.setAttribute(
+    'position',
+    new BufferAttribute(new Float32Array(4 * 3), 3),
+  );
+  geometry.setIndex([0, 1, 2, 0, 2, 3]);
+}
 
 /**
- * The accretion disk: one `Points` object whose particles never move on the
- * CPU. Each vertex carries static orbital elements and the vertex shader
- * integrates the orbit from a clock uniform, so changing particle count is the
- * only thing that ever touches a buffer.
+ * The accretion disk: instanced quads stretched along each particle's
+ * screen-space motion, so the disk reads as flowing light rather than as a
+ * cloud of dots. Particles never move on the CPU — each instance carries static
+ * orbital elements and the vertex shader integrates the orbit from a clock
+ * uniform, so changing particle count is the only thing that touches a buffer.
  */
 export class Disk {
-  readonly object: Points;
+  readonly object: Mesh;
   readonly material: ShaderMaterial;
-  private geometry: BufferGeometry;
+  private geometry: InstancedBufferGeometry;
   private count: number;
 
   constructor(count: number) {
     this.count = count;
     this.material = new ShaderMaterial({
-      vertexShader: glslPhysicsDefines() + diskVert,
-      fragmentShader: diskFrag,
+      vertexShader: glslPhysicsDefines() + lensingChunk + streakChunk + diskVert,
+      fragmentShader: streakChunk + diskFrag,
       uniforms: {
         uTime: { value: 0 },
         uSpin: { value: 1.0 },
         uDrift: { value: 0.012 },
         uScaleHeight: { value: 0.045 },
-        uSize: { value: 3.4 },
-        uPixelRatio: { value: 1 },
+        uSize: { value: 1.35 },
+        uResolution: { value: new Vector2(1, 1) },
         uAspect: { value: 1 },
         uBeamPower: { value: 2.0 },
         uEmissPower: { value: 1.6 },
@@ -43,7 +66,11 @@ export class Disk {
         uShadowNdc: { value: 0.12 },
         uWarp: { value: 1.0 },
         uIntro: { value: 0 },
-        uExposure: { value: 0.16 },
+        // Shutter interval, in simulation seconds. This is the only control on
+        // streak length — spin rate stays free to be tuned independently.
+        uShutter: { value: 2.6 },
+        uMaxStreak: { value: 0.09 },
+        uExposure: { value: 1.15 },
       },
       transparent: true,
       blending: AdditiveBlending,
@@ -52,11 +79,8 @@ export class Disk {
     });
 
     this.geometry = this.buildGeometry(count);
-    this.object = new Points(this.geometry, this.material);
+    this.object = new Mesh(this.geometry, this.material);
     this.object.frustumCulled = false;
-    // The disk is tilted rather than the camera, so the pointer can orbit the
-    // camera freely without changing how much of the disk face we see.
-    this.object.rotation.x = 0.0;
   }
 
   get particleCount(): number {
@@ -81,8 +105,11 @@ export class Disk {
     this.material.dispose();
   }
 
-  private buildGeometry(count: number): BufferGeometry {
-    // `position` carries orbital elements, not a location:
+  private buildGeometry(count: number): InstancedBufferGeometry {
+    const geometry = new InstancedBufferGeometry();
+    quadAttributes(geometry);
+
+    // Orbital elements, one per instance:
     //   x = migration phase / starting radius (0..1)
     //   y = initial orbital angle θ₀
     //   z = vertical offset within the scale height
@@ -101,11 +128,9 @@ export class Disk {
       seeds[i] = Math.random();
     }
 
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('position', new BufferAttribute(elements, 3));
-    geometry.setAttribute('aSeed', new BufferAttribute(seeds, 1));
-    // `position` is not a real position, so the automatic bounding sphere would
-    // be meaningless. Frustum culling is off, but three still reads this.
+    geometry.setAttribute('aElement', new InstancedBufferAttribute(elements, 3));
+    geometry.setAttribute('aSeed', new InstancedBufferAttribute(seeds, 1));
+    geometry.instanceCount = count;
     geometry.boundingSphere = new Sphere(new Vector3(0, 0, 0), DISK_OUTER * 1.5);
     return geometry;
   }

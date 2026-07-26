@@ -1,6 +1,7 @@
-// Accretion-disk particle fragment shader.
-// Draws each particle as a soft Gaussian blob tinted by its observed
-// temperature, additively blended into the HDR buffer.
+// Accretion-disk fragment shader.
+// Draws each instance as a soft capsule — a line segment with rounded caps —
+// tinted by its observed temperature and additively blended into the HDR
+// buffer. Requires streak.glsl to be prepended.
 
 precision highp float;
 
@@ -9,6 +10,8 @@ uniform float uExposure;
 varying float vBright;
 varying float vTemp;
 varying float vFade;
+varying vec2 vCorner;
+varying vec2 vStreak;
 
 // Approximate blackbody ramp, cool (deep red) to hot (blue-white). The blue end
 // is what the Doppler-boosted approaching limb of the disk lands on.
@@ -27,13 +30,8 @@ vec3 blackbodyRamp(float t) {
 }
 
 void main() {
-  vec2 c = gl_PointCoord - 0.5;
-  float d2 = dot(c, c);
-  if (d2 > 0.25) discard;
-
-  // Soft core with a wide halo reads far better than a hard disc when tens of
-  // thousands of sprites overlap.
-  float falloff = exp(-d2 * 7.5) * (1.0 - smoothstep(0.20, 0.25, d2));
+  float falloff = streakCoverage(vCorner, vStreak);
+  if (falloff < 0.004) discard;
 
   vec3 col = blackbodyRamp(vTemp) * vBright * vFade * falloff * uExposure;
   gl_FragColor = vec4(col, 1.0);

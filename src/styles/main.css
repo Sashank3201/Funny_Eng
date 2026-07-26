@@ -2,8 +2,8 @@
 
 :root {
   --ink: #f4f2ef;
-  --ink-dim: rgba(244, 242, 239, 0.66);
-  --ink-faint: rgba(244, 242, 239, 0.42);
+  --ink-dim: rgba(244, 242, 239, 0.68);
+  --ink-faint: rgba(244, 242, 239, 0.44);
   --accent: #ffb469;
   --line: rgba(244, 242, 239, 0.16);
 
@@ -13,6 +13,11 @@
 
   --pad: clamp(1.25rem, 4vw, 3.5rem);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Pointer position, in percent. Written from hero.ts and read by the glass
+     sheen so every surface catches the light from the same direction. */
+  --mx: 50%;
+  --my: 0%;
 
   /* Where the hole sits in the frame. Must track the focusX/focusY breakpoint
      in Renderer.ts so the poster and the live render agree. */
@@ -92,7 +97,7 @@ body {
   width: 100%;
   height: 100%;
   opacity: 0;
-  transition: opacity 1.2s var(--ease);
+  transition: opacity 1.4s var(--ease);
 }
 
 .has-webgl .hero__canvas {
@@ -102,23 +107,24 @@ body {
 /* Once WebGL is driving, the poster only needs to cover the very first frame. */
 .has-webgl .hero__poster {
   opacity: 0;
-  transition: opacity 1.4s var(--ease) 0.3s;
+  transition: opacity 1.6s var(--ease) 0.4s;
 }
 
 .no-webgl .hero__canvas {
   display: none;
 }
 
-/* Scrim: guarantees text contrast over whatever the simulation happens to be
-   doing behind it. */
+/* Scrim. Lighter than it would need to be on its own — the glass panel behind
+   the copy is now carrying most of the contrast, which leaves more of the
+   simulation visible. */
 .hero__scrim {
   position: absolute;
   inset: 0;
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(to right, rgba(3, 3, 8, 0.86) 0%, rgba(3, 3, 8, 0.35) 42%, transparent 68%),
-    linear-gradient(to top, rgba(3, 3, 8, 0.8) 0%, transparent 38%);
+    linear-gradient(to right, rgba(3, 3, 8, 0.5) 0%, rgba(3, 3, 8, 0.12) 45%, transparent 66%),
+    linear-gradient(to top, rgba(3, 3, 8, 0.55) 0%, transparent 34%);
 }
 
 .hero__content {
@@ -144,8 +150,9 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
+  padding: 0.55rem 1.1rem;
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-dim);
@@ -153,8 +160,8 @@ body {
 
 .hero__mark::before {
   content: '';
-  width: 0.55rem;
-  height: 0.55rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 12px 2px rgba(255, 180, 105, 0.7);
@@ -162,13 +169,14 @@ body {
 
 .hero__links {
   display: flex;
-  gap: 1.5rem;
+  gap: 1.4rem;
+  padding: 0.55rem 1.3rem;
 }
 
 .hero__link {
   color: var(--ink-dim);
   text-decoration: none;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   letter-spacing: 0.02em;
   transition: color 0.25s var(--ease);
 }
@@ -184,7 +192,16 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  max-width: min(38rem, 92%);
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* The panel bleeds into the page padding on the left so it reads as a slab
+   entering frame rather than a floating card. */
+.hero__panel {
+  width: min(52rem, 100%);
+  margin-left: calc(var(--pad) * -1);
+  padding-left: calc(var(--pad) + clamp(0.25rem, 1vw, 1rem));
 }
 
 .hero__eyebrow {
@@ -198,18 +215,20 @@ body {
 
 .hero__name {
   margin: 0;
-  font-size: clamp(3.2rem, 13vw, 9rem);
+  /* Sized so the longest realistic name still clears the panel's padding —
+     `.glass` clips overflow, so an oversized headline loses its last letter. */
+  font-size: clamp(2.7rem, 8.4vw, 6.5rem);
   font-weight: 500;
   line-height: 0.92;
   letter-spacing: -0.045em;
   /* A faint warm rim, as if the disk were lighting the letterforms. */
-  text-shadow: 0 0 60px rgba(255, 170, 90, 0.22);
+  text-shadow: 0 0 60px rgba(255, 170, 90, 0.24);
 }
 
 .hero__tagline {
   margin: 1.5rem 0 0;
-  max-width: 34ch;
-  font-size: clamp(1rem, 1.9vw, 1.2rem);
+  max-width: 32ch;
+  font-size: clamp(1rem, 1.8vw, 1.15rem);
   line-height: 1.55;
   color: var(--ink-dim);
 }
@@ -218,7 +237,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.85rem;
-  margin-top: 2.4rem;
+  margin-top: 2.2rem;
 }
 
 .btn {
@@ -226,45 +245,60 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 2.9rem;
-  padding: 0 1.5rem;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  padding: 0 1.6rem;
   color: var(--ink);
   font-size: 0.92rem;
   font-weight: 500;
+  font-family: inherit;
   letter-spacing: 0.01em;
   text-decoration: none;
-  background: rgba(244, 242, 239, 0.04);
-  backdrop-filter: blur(6px);
   transition:
-    background 0.3s var(--ease),
     border-color 0.3s var(--ease),
-    transform 0.3s var(--ease);
+    transform 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
 }
 
 .btn:hover,
 .btn:focus-visible {
-  background: rgba(244, 242, 239, 0.12);
-  border-color: rgba(244, 242, 239, 0.4);
   transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.28),
+    0 14px 40px rgba(0, 0, 0, 0.5);
 }
 
+/* The primary CTA is tinted glass rather than flat fill — it still reads as the
+   dominant action, but it belongs to the same material as everything else. */
 .btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
   color: #17110a;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 200, 140, 0.97) 0%,
+    rgba(255, 176, 100, 0.9) 100%
+  );
+  border-color: rgba(255, 214, 170, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -1px 0 rgba(120, 60, 10, 0.25),
+    0 10px 34px rgba(255, 150, 60, 0.22);
+}
+
+.has-glass .btn--primary {
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(22px) saturate(150%);
 }
 
 .btn--primary:hover,
 .btn--primary:focus-visible {
-  background: #ffc78d;
-  border-color: #ffc78d;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 rgba(120, 60, 10, 0.25),
+    0 16px 44px rgba(255, 150, 60, 0.32);
 }
 
 :where(a, button):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-  border-radius: 999px;
 }
 
 /* ---------------------------------------------------------------- bottom -- */
@@ -278,9 +312,11 @@ body {
 
 .hero__caption {
   margin: 0;
-  max-width: 30ch;
+  max-width: 46ch;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   line-height: 1.6;
   letter-spacing: 0.06em;
   color: var(--ink-faint);
@@ -324,6 +360,7 @@ body {
 
 /* --------------------------------------------------------------- reveals -- */
 
+.hero__panel,
 .hero__eyebrow,
 .hero__name,
 .hero__tagline,
@@ -337,50 +374,66 @@ body {
     transform 1s var(--ease);
 }
 
+/* The panel fades without sliding — a translating slab of glass draws the eye
+   away from the copy landing inside it. */
+.hero__panel {
+  transform: none;
+  transition: opacity 1.4s var(--ease);
+}
+
 .hero.is-ready .hero__top {
   opacity: 1;
   transform: none;
   transition-delay: 0.1s;
 }
-.hero.is-ready .hero__eyebrow {
+.hero.is-ready .hero__panel {
   opacity: 1;
-  transform: none;
-  transition-delay: 0.35s;
+  transition-delay: 0.25s;
 }
-.hero.is-ready .hero__name {
+.hero.is-ready .hero__eyebrow {
   opacity: 1;
   transform: none;
   transition-delay: 0.45s;
 }
+.hero.is-ready .hero__name {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.55s;
+}
 .hero.is-ready .hero__tagline {
   opacity: 1;
   transform: none;
-  transition-delay: 0.6s;
+  transition-delay: 0.7s;
 }
 .hero.is-ready .hero__actions {
   opacity: 1;
   transform: none;
-  transition-delay: 0.72s;
+  transition-delay: 0.82s;
 }
 .hero.is-ready .hero__bottom {
   opacity: 1;
   transform: none;
-  transition-delay: 0.85s;
+  transition-delay: 0.95s;
 }
 
 /* ------------------------------------------------------------ responsive -- */
 
-@media (max-width: 640px) {
+@media (max-width: 899px) {
   .hero__scrim {
     background:
-      linear-gradient(to top, rgba(3, 3, 8, 0.92) 0%, rgba(3, 3, 8, 0.45) 45%, transparent 78%),
-      radial-gradient(90vmax 60vmax at 20% 62%, rgba(3, 3, 8, 0.72), transparent 70%);
+      linear-gradient(to top, rgba(3, 3, 8, 0.72) 0%, rgba(3, 3, 8, 0.2) 46%, transparent 76%);
   }
 
   .hero__main {
-    max-width: 100%;
     justify-content: flex-end;
-    padding-bottom: 1rem;
+    align-items: stretch;
+  }
+
+  .hero__panel {
+    width: auto;
+    margin-left: calc(var(--pad) * -1);
+    margin-right: calc(var(--pad) * -1);
+    padding: 1.6rem var(--pad) 1.4rem;
   }
 
   .hero__links {
@@ -391,14 +444,18 @@ body {
     display: none;
   }
 
+  .hero__caption {
+    font-size: 0.62rem;
+  }
+
   .btn {
     flex: 1 1 auto;
   }
 }
 
 @media (min-width: 1800px) {
-  .hero__main {
-    max-width: 44rem;
+  .hero__panel {
+    width: min(58rem, 100%);
   }
 }
 
@@ -413,6 +470,7 @@ body {
     transition-duration: 0.001ms !important;
   }
 
+  .hero__panel,
   .hero__eyebrow,
   .hero__name,
   .hero__tagline,

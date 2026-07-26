@@ -12,35 +12,51 @@ export interface Tier {
   name: TierName;
   /** Number of accretion-disk particles. */
   particles: number;
+  /** Number of jet particles. */
+  jetParticles: number;
   /** Multiplier on the main render-target resolution. */
   renderScale: number;
-  /** Ping-pong blur iterations in the bloom chain. */
-  bloomIterations: number;
+  /** Levels in the bloom pyramid. */
+  bloomLevels: number;
   /** Upper bound on devicePixelRatio. */
   maxPixelRatio: number;
+  /**
+   * Whether backdrop-filter glass is affordable. It forces the compositor to
+   * re-read the live WebGL canvas every frame, which is genuinely expensive on
+   * weaker hardware.
+   */
+  glass: boolean;
 }
 
+// Counts are lower than they were for round sprites: a motion-blurred streak
+// covers far more area than a dot, so fewer of them fill the disk.
 export const TIERS: Record<TierName, Tier> = {
   high: {
     name: 'high',
-    particles: 240_000,
+    particles: 200_000,
+    jetParticles: 45_000,
     renderScale: 1.0,
-    bloomIterations: 3,
+    bloomLevels: 5,
     maxPixelRatio: 2,
+    glass: true,
   },
   medium: {
     name: 'medium',
-    particles: 120_000,
+    particles: 90_000,
+    jetParticles: 22_000,
     renderScale: 0.85,
-    bloomIterations: 2,
+    bloomLevels: 4,
     maxPixelRatio: 1.75,
+    glass: true,
   },
   low: {
     name: 'low',
-    particles: 45_000,
+    particles: 35_000,
+    jetParticles: 9_000,
     renderScale: 0.7,
-    bloomIterations: 1,
+    bloomLevels: 3,
     maxPixelRatio: 1.5,
+    glass: false,
   },
 };
 

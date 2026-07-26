@@ -1,7 +1,9 @@
 import {
+  type Blending,
   BufferAttribute,
   BufferGeometry,
   Mesh,
+  NormalBlending,
   OrthographicCamera,
   Scene,
   ShaderMaterial,
@@ -35,23 +37,37 @@ export class FullscreenPass {
   private readonly mesh: Mesh;
   private readonly geometry = triangleGeometry();
 
-  constructor(fragmentShader: string, uniforms: Record<string, { value: unknown }>) {
+  constructor(
+    fragmentShader: string,
+    uniforms: Record<string, { value: unknown }>,
+    blending: Blending = NormalBlending,
+  ) {
     this.material = new ShaderMaterial({
       vertexShader: fullscreenVert,
       fragmentShader,
       uniforms,
       depthTest: false,
       depthWrite: false,
+      blending,
+      transparent: blending !== NormalBlending,
     });
     this.mesh = new Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false;
     this.scene.add(this.mesh);
   }
 
-  /** Render into `target`, or to the canvas when `target` is null. */
-  render(renderer: WebGLRenderer, target: WebGLRenderTarget | null): void {
+  /**
+   * Render into `target`, or to the canvas when `target` is null.
+   *
+   * `clear` is false for the bloom pyramid's upsample steps, which blend
+   * additively into whatever the larger mip already holds.
+   */
+  render(renderer: WebGLRenderer, target: WebGLRenderTarget | null, clear = true): void {
     renderer.setRenderTarget(target);
+    const prevAutoClear = renderer.autoClear;
+    renderer.autoClear = clear;
     renderer.render(this.scene, camera);
+    renderer.autoClear = prevAutoClear;
   }
 
   dispose(): void {

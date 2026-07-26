@@ -25,6 +25,7 @@ export const content = {
     { label: 'LinkedIn', href: 'https://www.linkedin.com/' },
   ],
 
-  /** Caption in the lower corner, describing what the visual actually is. */
-  caption: 'Schwarzschild black hole · Keplerian disk · relativistic beaming',
+  /** Caption in the lower corner, describing what the visual actually is.
+   *  Keep it short — it sits in a pill and wraps badly past two clauses. */
+  caption: 'Schwarzschild geometry · relativistic beaming',
 } as const;

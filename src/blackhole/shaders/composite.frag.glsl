@@ -1,15 +1,22 @@
-// Final composite: bloom, tonemap, lens artefacts, grain, sRGB encode.
+// Final composite: bloom, anamorphic streak, halation, filmic grade, lens
+// artefacts, grain, sRGB encode.
 
 precision highp float;
 
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
+uniform sampler2D uStreak;
 uniform float uBloomIntensity;
+uniform float uStreakIntensity;
+uniform float uHalation;
 uniform float uExposure;
 uniform float uTime;
 uniform float uAberration;
 uniform float uGrain;
 uniform float uVignette;
+uniform float uContrast;
+uniform vec3 uShadowTint;
+uniform vec3 uHighlightTint;
 
 varying vec2 vUv;
 
@@ -45,9 +52,26 @@ void main() {
   col.g = texture2D(uScene, vUv).g;
   col.b = texture2D(uScene, vUv - off).b;
 
-  col += texture2D(uBloom, vUv).rgb * uBloomIntensity;
+  vec3 bloom = texture2D(uBloom, vUv).rgb;
+  col += bloom * uBloomIntensity;
+
+  // Halation: on film the red-sensitive layer scatters furthest, so highlights
+  // bleed warm. Reusing the bloom buffer weighted toward red costs nothing.
+  col += bloom * vec3(1.0, 0.34, 0.12) * uHalation;
+
+  // Anamorphic horizontal flare, biased cool so it reads as a lens artefact
+  // rather than as more disk.
+  col += texture2D(uStreak, vUv).rgb * vec3(0.55, 0.75, 1.0) * uStreakIntensity;
 
   col = acesFilm(col * uExposure);
+
+  // Filmic S-curve.
+  col = mix(col, col * col * (3.0 - 2.0 * col), uContrast);
+
+  // Split-toning: cool shadows, warm highlights. Subtle, and it is what makes
+  // the amber disk sit in the frame rather than on top of it.
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col *= mix(uShadowTint, uHighlightTint, smoothstep(0.0, 0.7, lum));
 
   // Vignette pulls the eye to the centre of the frame.
   col *= 1.0 - uVignette * smoothstep(0.15, 0.75, r2);
