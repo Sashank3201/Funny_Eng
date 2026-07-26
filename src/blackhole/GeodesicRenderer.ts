@@ -132,6 +132,8 @@ export class GeodesicRenderer {
   private camSpeed = 0;
   /** Diagnostic mode freezes the idle motion so measurements are repeatable. */
   private diagnostic = false;
+  /** Constructed values of every graded scalar, for the diagnostic modes. */
+  private readonly gradeDefaults: Record<string, number> = {};
 
   constructor(options: GeodesicOptions) {
     this.reducedMotion = options.reducedMotion ?? false;
@@ -163,6 +165,10 @@ export class GeodesicRenderer {
       uScene: { value: null },
       uThreshold: { value: 0.62 },
       uKnee: { value: 0.4 },
+      // How hard one source is allowed to drive the glare. The beamed limb
+      // reaches tens of times this; everything past it is compressed
+      // logarithmically rather than fed to the blur at full strength.
+      uBloomClamp: { value: 0.22 },
     });
 
     this.downsample = new FullscreenPass(downsampleFrag, {
@@ -190,21 +196,36 @@ export class GeodesicRenderer {
       uScene: { value: null },
       uBloom: { value: null },
       uStreak: { value: null },
-      uBloomIntensity: { value: 0.34 },
-      uStreakIntensity: { value: 0.18 },
-      uHalation: { value: 0.12 },
-      uExposure: { value: 1.15 },
+      uBloomIntensity: { value: 0.22 },
+      uStreakIntensity: { value: 0.04 },
+      uHalation: { value: 0.07 },
+      uExposure: { value: 1.12 },
       uTime: { value: 0 },
       uAberration: { value: 0.008 },
       uGrain: { value: 0.012 },
       uVignette: { value: 0.48 },
-      uContrast: { value: 0.2 },
+      uContrast: { value: 0.18 },
       uSaturation: { value: 1.22 },
+      uKneeThreshold: { value: 0.50 },
+      uKneeStrength: { value: 0.32 },
       uShadowTint: { value: new Color(0.9, 0.95, 1.07) },
       uHighlightTint: { value: new Color(1.06, 0.99, 0.92) },
     });
 
     this.buildGeodesicPass();
+
+    // Snapshot the graded scalars now, so the diagnostic modes have something
+    // authoritative to restore to. Only numbers — the tints are never altered.
+    for (const uniforms of [this.composite.material.uniforms, this.bright.material.uniforms]) {
+      for (const [name, u] of Object.entries(uniforms)) {
+        if (typeof u.value === 'number') this.gradeDefaults[name] = u.value;
+      }
+    }
+    const g0 = this.geodesic.material.uniforms;
+    for (const name of ['uSkyBrightness', 'uDiskOpacity', 'uDiskBrightness', 'uDiskHR']) {
+      this.gradeDefaults[name] = g0[name].value as number;
+    }
+
     this.governor = new QualityGovernor(this.tier, (tier) => this.applyTier(tier));
 
     this.createTargets();
@@ -589,18 +610,54 @@ export class GeodesicRenderer {
    */
   setDiagnostic(enabled: boolean): void {
     this.diagnostic = enabled;
-    this.geodesic.material.uniforms.uFlatSky.value = enabled ? 1 : 0;
+    const g = this.geodesic.material.uniforms;
+
+    if (!enabled) {
+      this.restoreGrade();
+      g.uFlatSky.value = 0;
+      this.historyDirty = true;
+      return;
+    }
+
     const c = this.composite.material.uniforms;
-    c.uGrain.value = enabled ? 0 : 0.012;
-    c.uVignette.value = enabled ? 0 : 0.48;
-    c.uAberration.value = enabled ? 0 : 0.008;
-    c.uBloomIntensity.value = enabled ? 0 : 0.34;
-    c.uStreakIntensity.value = enabled ? 0 : 0.18;
-    c.uHalation.value = enabled ? 0 : 0.12;
-    c.uContrast.value = enabled ? 0 : 0.2;
-    c.uExposure.value = enabled ? 1.0 : 1.15;
-    this.geodesic.material.uniforms.uSkyBrightness.value = enabled ? 6.0 : 1.0;
+    g.uFlatSky.value = 1;
+    g.uSkyBrightness.value = 6.0;
+    c.uGrain.value = 0;
+    c.uVignette.value = 0;
+    c.uAberration.value = 0;
+    c.uBloomIntensity.value = 0;
+    c.uStreakIntensity.value = 0;
+    c.uHalation.value = 0;
+    c.uContrast.value = 0;
+    c.uExposure.value = 1.0;
+    // Bypass the highlight shoulder as well. The test locates the shadow's edge
+    // as a 50 % luminance crossing, so any curve applied to the flat test sky
+    // moves that crossing and the measured radius drifts with the grade instead
+    // of with the geometry — retuning the shoulder took it from 0.91 % to 1.33 %
+    // without a line of the integrator changing.
+    c.uKneeThreshold.value = 1e6;
+    c.uSaturation.value = 1;
     this.historyDirty = true;
+  }
+
+  /**
+   * Put every graded uniform back to the value it was constructed with.
+   *
+   * The diagnostic modes used to restore by writing literals back, which meant
+   * the same number lived in three places and silently went stale every time
+   * the grade was retuned. Snapshotting at construction makes the defaults
+   * single-sourced by definition.
+   */
+  private restoreGrade(): void {
+    for (const [name, v] of Object.entries(this.gradeDefaults)) {
+      const c = this.composite.material.uniforms;
+      const b = this.bright.material.uniforms;
+      const g = this.geodesic.material.uniforms;
+      if (name in c) c[name].value = v;
+      else if (name in b) b[name].value = v;
+      else if (name in g) g[name].value = v;
+    }
+    this.geodesic.material.uniforms.uJetOn.value = this.tier.jets ? 1 : 0;
   }
 
   /**
@@ -611,30 +668,53 @@ export class GeodesicRenderer {
    */
   setDiskProbe(enabled: boolean): void {
     this.diagnostic = enabled;
+
+    if (!enabled) {
+      this.restoreGrade();
+      this.geodesic.material.uniforms.uFlatSky.value = 0;
+      this.historyDirty = true;
+      return;
+    }
+
     const c = this.composite.material.uniforms;
     const g = this.geodesic.material.uniforms;
 
-    c.uGrain.value = enabled ? 0 : 0.012;
-    c.uVignette.value = enabled ? 0 : 0.48;
-    c.uAberration.value = enabled ? 0 : 0.008;
-    c.uBloomIntensity.value = enabled ? 0 : 0.34;
-    c.uStreakIntensity.value = enabled ? 0 : 0.18;
-    c.uHalation.value = enabled ? 0 : 0.12;
-    c.uContrast.value = enabled ? 0 : 0.2;
-    c.uSaturation.value = enabled ? 1 : 1.22;
-    c.uExposure.value = enabled ? 1 : 1.15;
+    c.uGrain.value = 0;
+    c.uVignette.value = 0;
+    c.uAberration.value = 0;
+    c.uBloomIntensity.value = 0;
+    c.uStreakIntensity.value = 0;
+    c.uHalation.value = 0;
+    c.uContrast.value = 0;
+    c.uSaturation.value = 1;
+    c.uKneeThreshold.value = 1e6; // bypass the shoulder entirely
+    c.uExposure.value = 1;
 
     g.uFlatSky.value = 0;
-    g.uSkyBrightness.value = enabled ? 0 : 1;
-    g.uJetOn.value = enabled ? 0 : (this.tier.jets ? 1 : 0);
-    g.uDiskOpacity.value = enabled ? 0.02 : 0.85;
-    g.uDiskBrightness.value = 2.6;
+    g.uSkyBrightness.value = 0;
+    g.uJetOn.value = 0;
+    g.uDiskOpacity.value = 0.02;
     this.historyDirty = true;
   }
 
   /** Override the disk scale height. Used by the thickness test. */
   setScaleHeight(hr: number): void {
     this.geodesic.material.uniforms.uDiskHR.value = hr;
+    this.historyDirty = true;
+  }
+
+  /**
+   * Set grade uniforms by name at runtime, so candidate values can be swept
+   * against the live render and measured rather than judged by eye.
+   */
+  setGrade(values: Record<string, number>): void {
+    const c = this.composite.material.uniforms;
+    const b = this.bright.material.uniforms;
+    for (const [name, v] of Object.entries(values)) {
+      const target = name in c ? c : name in b ? b : null;
+      if (!target) throw new Error(`unknown grade uniform: ${name}`);
+      target[name].value = v;
+    }
     this.historyDirty = true;
   }
 

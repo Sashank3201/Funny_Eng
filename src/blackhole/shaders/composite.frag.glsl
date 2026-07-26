@@ -16,10 +16,47 @@ uniform float uGrain;
 uniform float uVignette;
 uniform float uContrast;
 uniform float uSaturation;
+uniform float uKneeThreshold;
+uniform float uKneeStrength;
 uniform vec3 uShadowTint;
 uniform vec3 uHighlightTint;
 
 varying vec2 vUv;
+
+/**
+ * Highlight shoulder.
+ *
+ * The disk spans roughly 70:1 between its approaching and receding limbs,
+ * because relativistic beaming scales observed intensity as g⁴. Lowering
+ * exposure to stop the bright limb clipping takes the dim limb down with it and
+ * loses that side instead, so instead only what is above the threshold gets
+ * compressed and the shadows and midtones pass through untouched.
+ *
+ * The compression is logarithmic, not Reinhard. A Reinhard rolloff on the
+ * excess, `T + e/(1+ke)`, converges on `T + 1/k` — so every value past a few
+ * multiples of the threshold lands within a hair of the same number. At
+ * T=0.80, k=0.70 that put excesses of 5 and 200 at 0.910 and 0.926 on screen:
+ * a 40:1 range in the bright limb rendered as a 1.8 % difference, which is why
+ * the approaching side read as one flat slab. `T + s·ln(1 + e/s)` is unbounded
+ * and its slope decays instead of vanishing, so a ratio in the highlights stays
+ * a visible ratio.
+ *
+ * It is applied to luminance with the channels scaled by the result, not
+ * per-channel. Compressing each channel separately drives R, G and B toward a
+ * common ceiling and bleaches the hottest gas to paper white; scaling by a
+ * single factor keeps its colour.
+ *
+ * This is a display mapping. It changes nothing about the g⁴ physics that
+ * produced the range.
+ */
+vec3 highlightShoulder(vec3 c) {
+  float l = max(dot(c, vec3(0.2126, 0.7152, 0.0722)), 1e-5);
+  if (l <= uKneeThreshold) return c;
+
+  float over = l - uKneeThreshold;
+  float mapped = uKneeThreshold + uKneeStrength * log(1.0 + over / uKneeStrength);
+  return c * (mapped / l);
+}
 
 // Narkowicz's ACES approximation — keeps the blown-out inner disk from
 // clipping to flat white.
@@ -64,7 +101,7 @@ void main() {
   // rather than as more disk.
   col += texture2D(uStreak, vUv).rgb * vec3(0.55, 0.75, 1.0) * uStreakIntensity;
 
-  col = acesFilm(col * uExposure);
+  col = acesFilm(highlightShoulder(col * uExposure));
 
   // Filmic S-curve.
   col = mix(col, col * col * (3.0 - 2.0 * col), uContrast);

@@ -24,22 +24,32 @@ export interface Keyframe extends CameraState {
  * positive Y is above. Elevation near zero is near edge-on, which is where the
  * lensed secondary image reads most clearly.
  *
- * The rule every pose obeys: the *core* — shadow, photon ring and the secondary
- * arcs, roughly 280 px across at distance 30 on a 900 px-tall viewport — is
- * fully on screen and clear of the copy. Only the dim outer disk is allowed to
- * crop at the frame edge. On a 1440-wide viewport that puts focusX in roughly
- * [0.52, 0.61]: below it the core slides under the text, above it the shadow
- * clips off the right edge.
+ * Two rules every pose obeys.
+ *
+ * First, the *core* — shadow, photon ring and the secondary arcs, roughly 280 px
+ * across at distance 30 on a 900 px-tall viewport — is fully on screen and clear
+ * of the copy.
+ *
+ * Second, and this is the one that was missing: the **approaching limb tapers
+ * inside the frame**. It used to be treated as "only the dim outer disk crops at
+ * the edge", but relativistic beaming makes that limb the brightest thing in the
+ * picture — 20:1 over the receding side at the flux peak and 80:1 at the ISCO —
+ * so cropping it leaves a hard vertical wall of white against the bezel while
+ * the receding side tapers to a wisp. Measured before this was fixed, the
+ * rightmost pixels peaked at 0.93 luminance in all four sections.
+ *
+ * The limb reaches further than the disk's 10 Rs because its glare goes with it,
+ * so the margin is set from measurement (`edge-check.mjs`) rather than geometry.
  */
 export const KEYFRAMES: Keyframe[] = [
   {
     // Hero — the reference pose. Near edge-on, which is what produces the
     // Einstein-ring silhouette with the disk arcing over *and* under.
     id: 'hero',
-    distance: 30,
+    distance: 33,
     azimuth: 0,
     elevation: 0.10,
-    focusX: 0.42,
+    focusX: 0.24,
     focusY: 0.02,
   },
   {
@@ -47,30 +57,30 @@ export const KEYFRAMES: Keyframe[] = [
     // open than the hero for variety, and lifted slightly so the project rows
     // run under the disk rather than through the core.
     id: 'work',
-    distance: 30,
+    distance: 33,
     azimuth: 1.15,
     elevation: 0.165,
-    focusX: 0.56,
+    focusX: 0.30,
     focusY: 0.10,
   },
   {
     // About — the thinnest inclination on the page. Almost perfectly edge-on,
     // so the disk collapses to a blade of light through the photon ring.
     id: 'about',
-    distance: 29,
+    distance: 32,
     azimuth: 2.35,
     elevation: 0.045,
-    focusX: 0.56,
+    focusX: 0.30,
     focusY: -0.14,
   },
   {
     // Contact — closest, and the only pose where the hole is allowed to
     // dominate, because there is barely any copy here to protect.
     id: 'contact',
-    distance: 26,
+    distance: 29,
     azimuth: 3.5,
     elevation: 0.125,
-    focusX: 0.50,
+    focusX: 0.22,
     focusY: -0.22,
   },
 ];
@@ -119,9 +129,21 @@ export function poseForProgress(progress: number): CameraState {
  * badly wrong on a tall phone, where the disk grows until it runs off both
  * edges. Scaling by the inverse aspect frames it against the *smaller*
  * dimension instead, which is what keeps the whole disk on screen.
+ *
+ * The trailing factor is margin — above 1 it pulls the camera back, which is the
+ * direction that shrinks the hole. It used to be 0.95, i.e. slightly *closer*
+ * than the bare aspect fit, which fitted the disk's geometry and nothing else.
+ * That was not enough: the approaching limb carries a glare halo reaching past
+ * 10 Rs, and on a phone there is no room to spare — cropping it was exactly what
+ * made the limb read as a wall of white against the right bezel.
+ *
+ * 1.06 is the measured value, not a guess. At 393×852 it puts the peak luminance
+ * in the outermost columns at 0.35 on the left and 0.35 on the right — both equal
+ * to the bare sky, which is what "the limb ends before the frame does" looks like
+ * numerically. Anything below about 1.05 starts to clip the limb again.
  */
 export function adaptForNarrow(pose: CameraState, aspect: number): CameraState {
-  const fit = Math.min(2.2, Math.max(1, 1 / Math.max(aspect, 0.01))) * 0.95;
+  const fit = Math.min(2.2, Math.max(1, 1 / Math.max(aspect, 0.01))) * 1.06;
   return {
     ...pose,
     distance: pose.distance * fit,

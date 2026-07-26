@@ -93,8 +93,34 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
       return [...document.querySelectorAll(sel)]
         .filter((n) => n.textContent.trim() && n.offsetParent !== null)
         .map((n) => {
-          const r = n.getBoundingClientRect();
           const cs = getComputedStyle(n);
+          // Measure the glyphs, not the element's box.
+          //
+          // A block-level <p> is as wide as its container even when its text
+          // stops a quarter of the way across, so sampling the box samples
+          // scene the reader never sees behind a letter. The hero eyebrow is
+          // 832 px wide holding 223 px of text; the brightest pixel in that box
+          // was 600 px to the right of the last glyph, out in the disk's glow.
+          // That cuts both ways — it also let a genuinely bright patch pass
+          // unnoticed whenever the disk happened to sit elsewhere.
+          //
+          // Range rects give the inline boxes the text actually occupies, one
+          // per wrapped line.
+          const rects = [];
+          for (const child of n.childNodes) {
+            if (child.nodeType !== Node.TEXT_NODE || !child.textContent.trim()) continue;
+            const range = document.createRange();
+            range.selectNodeContents(child);
+            for (const r of range.getClientRects()) {
+              if (r.width > 1 && r.height > 1) rects.push(r);
+            }
+          }
+          // Each wrapped line is kept separately rather than unioned: a ragged
+          // last line would otherwise drag the empty space beside it back in.
+          const lines = (rects.length ? rects : [n.getBoundingClientRect()]).map((q) => ({
+            x: Math.round(q.left), y: Math.round(q.top),
+            w: Math.round(q.width), h: Math.round(q.height),
+          }));
           // An element painting its own background (the primary CTA) is judged
           // against that, not against the scene behind the whole page.
           let ownBg = null;
@@ -107,12 +133,17 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
             text: n.textContent.trim().slice(0, 28),
             color: cs.color,
             ownBg,
-            x: Math.round(r.left), y: Math.round(r.top),
-            w: Math.round(r.width), h: Math.round(r.height),
+            lines,
             size: parseFloat(cs.fontSize),
           };
         })
-        .filter((b) => b.w > 4 && b.h > 4 && b.y >= 0 && b.y + b.h <= window.innerHeight);
+        .map((b) => ({
+          ...b,
+          lines: b.lines.filter(
+            (l) => l.w > 4 && l.h > 4 && l.y >= 0 && l.y + l.h <= window.innerHeight,
+          ),
+        }))
+        .filter((b) => b.lines.length);
     });
 
     // Measure the backdrop with the text hidden. `visibility: hidden` keeps
@@ -139,11 +170,13 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
         const [br, bg2, bb] = b.ownBg.match(/[\d.]+/g).slice(0, 3).map(Number);
         maxBg = lum(br, bg2, bb);
       } else
-      for (let y = b.y; y < b.y + b.h; y += 2) {
-        for (let x = b.x; x < b.x + b.w; x += 3) {
-          if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue;
-          const i = (png.width * y + x) * 4;
-          maxBg = Math.max(maxBg, lum(png.data[i], png.data[i + 1], png.data[i + 2]));
+      for (const l of b.lines) {
+        for (let y = l.y; y < l.y + l.h; y += 2) {
+          for (let x = l.x; x < l.x + l.w; x += 3) {
+            if (x < 0 || y < 0 || x >= png.width || y >= png.height) continue;
+            const i = (png.width * y + x) * 4;
+            maxBg = Math.max(maxBg, lum(png.data[i], png.data[i + 1], png.data[i + 2]));
+          }
         }
       }
       // Composite the text colour over that background at its own alpha.
