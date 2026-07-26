@@ -77,9 +77,22 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
 // ---- 4. Measured contrast of every text run against the LIVE render --------
 // Sample the actual rendered pixels behind each element, not an assumed colour.
 {
-  for (const vp of [{ width: 1440, height: 900, label: 'desktop' }, { width: 393, height: 852, label: 'mobile' }]) {
+  // `ONLY=desktop` / `ONLY=mobile` runs a single width. Both widths in one
+  // process drives a WebGL canvas through eight scroll-and-settle cycles and has
+  // run the container out of memory; splitting them keeps each browser short-lived.
+  const only = process.env.ONLY;
+  const viewports = [
+    { width: 1440, height: 900, label: 'desktop' },
+    { width: 393, height: 852, label: 'mobile' },
+  ].filter((v) => !only || v.label === only);
+
+  for (const vp of viewports) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1, isMobile: vp.label === 'mobile', hasTouch: vp.label === 'mobile' });
   const page = await ctx.newPage();
+  // There is no GPU here, so the march runs on SwiftShader and a full-page
+  // screenshot of a live WebGL canvas can sit well past Playwright's 30 s
+  // default before it returns.
+  page.setDefaultTimeout(120000);
   await page.goto(BASE + '?tier=high', { waitUntil: 'load' });
   await page.waitForTimeout(12000);
 
@@ -189,12 +202,16 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
       worst.push({ section: id, text: b.text, size: b.size, ratio: +ratio.toFixed(2), needs: large ? 3 : 4.5, pass: ratio >= (large ? 3 : 4.5) });
     }
   }
-  const fails = worst.filter((w) => !w.pass).sort((a, b) => a.ratio - b.ratio);
+  const ranked = [...worst].sort((a, b) => a.ratio / a.needs - b.ratio / b.needs);
+  // Reported whether or not they pass, ranked by how close they are to their own
+  // threshold. Listing failures alone hides a margin quietly collapsing toward
+  // the limit — and the scene moves under the text, so a run sitting just above
+  // its threshold in a still frame is a run that can dip below it in motion.
   out.push({
     case: `contrast-${vp.label}`,
     runsChecked: worst.length,
-    failures: fails.length,
-    worstFive: fails.slice(0, 5),
+    failures: ranked.filter((w) => !w.pass).length,
+    tightestFive: ranked.slice(0, 5),
     minRatio: +Math.min(...worst.map((w) => w.ratio)).toFixed(2),
   });
   await ctx.close();

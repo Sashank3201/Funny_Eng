@@ -163,8 +163,8 @@ body {
      box — guarantees it ground wherever the disk drifts. */
   background: linear-gradient(
     to bottom,
-    rgba(4, 5, 10, 0.88) 0%,
-    rgba(4, 5, 10, 0.5) 55%,
+    rgba(4, 5, 10, 0.92) 0%,
+    rgba(4, 5, 10, 0.62) 55%,
     transparent 100%
   );
   align-items: baseline;
@@ -266,6 +266,11 @@ body {
 
 /* The instrument readout — states what the renderer is actually doing. It
    belongs to the subject rather than decorating it. */
+/* Stays bottom-left, below the hero copy, which clears it by design. Moving it
+   opposite the wordmark composed better but put it under the approaching limb's
+   glare, where it measured 4.60 against a 4.5 threshold — a 2 % margin on text
+   this small, with a scene that moves underneath it. This corner is the darkest
+   part of the frame in every pose, which is why it was chosen. */
 .readout {
   left: var(--gutter);
   bottom: clamp(1rem, 2.5vw, 1.9rem);
@@ -350,6 +355,24 @@ main {
 }
 
 /* ================================================================== hero == */
+
+/*
+ * The hero copy sits on the floor of the frame, not in the middle of it.
+ *
+ * The hole is high and to the right and stays exactly where the framing work
+ * put it, so dropping the name to the bottom-left opens a clean diagonal across
+ * the empty quarter of the picture instead of setting type and disk side by
+ * side at the same height.
+ *
+ * The bottom padding is doing two jobs. It is the breathing room that makes
+ * anchored copy read as composition rather than as overflow, and it is the
+ * clearance over the physics readout fixed in the same corner — at this value
+ * the buttons finish about 33 px above it.
+ */
+.section--hero {
+  align-items: flex-end;
+  padding-bottom: clamp(5rem, 13vh, 9rem);
+}
 
 .section--hero .section__inner {
   max-width: 52rem;
@@ -751,6 +774,30 @@ main {
       rgba(4, 5, 10, 0.70) 22%,
       rgba(4, 5, 10, 0.88) 46%,
       rgba(4, 5, 10, 0.94) 100%
+    );
+  }
+
+  /*
+   * A much heavier scrim on narrow screens, because this is the one layout
+   * where the hole is directly behind the header.
+   *
+   * `adaptForNarrow` lifts the hole toward the top of the frame — it has to, the
+   * copy stacks underneath rather than beside it — so the disk passes under the
+   * fixed header instead of well below it. Measured at 393 px, the mark fell to
+   * 3.12 against its 4.5 threshold in two of the four poses while the same mark
+   * on desktop never entered the tightest five.
+   *
+   * The band is held near-opaque through the mark's own line rather than being
+   * faded by the midpoint, then released. The mobile veil is already strong, so
+   * this reads as part of the same falloff rather than as a bar.
+   */
+  .chrome {
+    background: linear-gradient(
+      to bottom,
+      rgba(4, 5, 10, 0.96) 0%,
+      rgba(4, 5, 10, 0.90) 62%,
+      rgba(4, 5, 10, 0.55) 85%,
+      transparent 100%
     );
   }
 
