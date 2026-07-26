@@ -99,11 +99,12 @@ export function renderSections(root: HTMLElement): void {
   const heroSection = el('section', 'section section--hero');
   heroSection.id = 'hero';
   const heroInner = el('div', 'section__inner');
-  heroInner.append(
-    el('p', 'hero__eyebrow reveal', hero.eyebrow),
-    heroWordmark(hero.headline),
-    el('p', 'hero__standfirst reveal', hero.standfirst),
-  );
+  heroInner.append(el('p', 'hero__eyebrow reveal', hero.eyebrow), heroWordmark(hero.headline));
+  // Optional: an empty standfirst leaves no empty paragraph behind to collapse
+  // the spacing around.
+  if (hero.standfirst) {
+    heroInner.append(el('p', 'hero__standfirst reveal', hero.standfirst));
+  }
 
   const actions = el('div', 'hero__actions reveal');
   for (const action of hero.actions) {

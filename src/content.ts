@@ -49,8 +49,9 @@ export const content = {
   hero: {
     eyebrow: 'Cyber Security Analyst',
     headline: 'Sashank',
-    standfirst:
-      'I work on systems, and on how they hold up when someone goes looking for the weak points.',
+    /** Optional. Left empty deliberately — the hero is the name and nothing
+     *  else. Put a sentence back here and it renders again. */
+    standfirst: '',
     actions: [
       { label: 'See the work', href: '#work', primary: true },
       { label: 'Get in touch', href: '#contact', primary: false },

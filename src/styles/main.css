@@ -764,7 +764,11 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  margin-top: 2.8rem;
+  /* Tightened from 2.8rem. The block is anchored to the bottom, so closing this
+     gap drops the name rather than lifting the buttons — which is the only way
+     left to move it down: the buttons already finish a hair above the readout
+     fixed in the same corner. */
+  margin-top: 1.75rem;
 }
 
 .btn {
