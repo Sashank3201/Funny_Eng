@@ -268,7 +268,7 @@ export class GeodesicRenderer {
       uJetOn: { value: this.tier.jets ? 1 : 0 },
       uFlatSky: { value: 0 },
       uTime: { value: 0 },
-      uDiskTemp: { value: 4400 },
+      uDiskTemp: { value: 4120 },
       uDiskBrightness: { value: 2.6 },
       uDiskOpacity: { value: 0.85 },
       uDiskHR: { value: DISK_SCALE_HEIGHT },

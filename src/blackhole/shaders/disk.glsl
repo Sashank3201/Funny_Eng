@@ -16,6 +16,9 @@ uniform float uDiskSpin;       // +1 prograde about +Y, −1 retrograde
 uniform float uDiskHR;         // scale height as a fraction of radius, H/R
 uniform float uTime;
 
+/** Trailing-spiral winding. Pitch angle is atan(1/SPIRAL_WIND). */
+const float SPIRAL_WIND = 3.0;
+
 /**
  * Page & Thorne (1974) relativistic thin-disk flux, Schwarzschild limit,
  * normalised to peak at 1.
@@ -67,18 +70,41 @@ float diskDensity(vec3 p, out float rc) {
   radial *= 1.0 - smoothstep(DISK_OUTER * 0.72, DISK_OUTER, rc);
   if (radial <= 0.0) return 0.0;
 
+  // ---- Turbulence, in the disk's own coordinates --------------------------
+  //
+  // The pattern is sampled in (ln r, φ, z/H) rather than in x/y/z, and that one
+  // change is what makes it read as gas rather than as noise painted on a ring.
+  //
+  // A thin disk is self-similar: its scale height goes as H ∝ r, and the
+  // turbulent cells go with it. Sampling at a fixed spatial frequency, as this
+  // did before, gives eddies the same physical size at the ISCO and at the outer
+  // edge — so the hot inner disk looked as coarse as the cool outer one, which
+  // is backwards. Constant cell size in *log* radius means physical size ∝ r:
+  // fine structure where the disk is hot, bright and small-scale, broad
+  // structure further out.
+  //
+  // φ is mapped onto a circle in the noise domain instead of used directly.
+  // Sampling an angle gives a seam at ±π; sampling `(cos φ, sin φ)` wraps
+  // exactly, with a uniform metric all the way round.
   float omega = uDiskSpin * sqrt(MASS / (rc * rc * rc));
-  float ang = -omega * uTime * 0.55;
-  float ca = cos(ang), sa = sin(ang);
-  vec2 q = vec2(p.x * ca - p.z * sa, p.x * sa + p.z * ca);
 
-  // 3-D, not 2-D. A purely radial-azimuthal field gives every sample in a
-  // vertical column the same value, so integrating along the ray just
-  // multiplies by path length and averages the structure away to a smooth
-  // glow. Varying with height is what lets filaments survive the integral.
-  vec3 qq = vec3(q.x, p.y * 4.0, q.y);
-  float turb = fbm3(qq * 0.75, 3) * 0.62 + fbm3(qq * 2.3 + 11.0, 2) * 0.38;
-  turb = mix(0.12, 1.95, smoothstep(0.30, 0.72, turb));
+  // Orbital phase, plus a *static* logarithmic twist. Differential rotation
+  // alone already shears the pattern, but it shears without limit — the longer
+  // the page is open the more tightly wound it gets, until the arms alias into
+  // noise. A fixed `k·ln r` term holds a steady trailing pitch of atan(1/k),
+  // about 18° here, which is the range MRI turbulence actually sits in.
+  float ang = -omega * uTime * 0.55 - uDiskSpin * SPIRAL_WIND * log(rc);
+
+  float phi = atan(p.z, p.x) + ang;
+
+  // Height still has to enter the field. A purely radial-azimuthal pattern gives
+  // every sample in a vertical column the same value, so integrating along the
+  // ray just multiplies by path length and averages the structure away.
+  float ring = 2.6 + z * 0.35;
+  vec3 qq = vec3(cos(phi) * ring, sin(phi) * ring, log(rc) * 2.0 + z * 0.6);
+
+  float turb = fbm3(qq * 1.05, 3) * 0.62 + fbm3(qq * 2.8 + 11.0, 2) * 0.38;
+  turb = mix(0.10, 2.05, smoothstep(0.32, 0.70, turb));
 
   return vertical * radial * turb;
 }
