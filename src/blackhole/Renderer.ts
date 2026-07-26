@@ -31,8 +31,16 @@ import lensFrag from './shaders/lens.frag.glsl?raw';
 import upsampleFrag from './shaders/upsample.frag.glsl?raw';
 
 const FOV = 42;
-/** Camera distance from the hole, in Schwarzschild radii. */
-const CAM_DISTANCE = 26 * RS;
+
+/**
+ * Shadow diameter as a fraction of the *smaller* viewport dimension.
+ *
+ * The vertical field of view is fixed, so a fixed camera distance sizes the
+ * hole against height alone — which is fine in landscape and badly wrong on a
+ * tall phone, where the hole grows until the disk runs off both edges. Framing
+ * against the smaller dimension keeps it composed at any aspect.
+ */
+const SHADOW_FRACTION = 0.26;
 /** Elevation above the disk plane. Near edge-on is what makes the lensed arc read. */
 const CAM_ELEVATION = 0.20; // radians, ≈ 11°
 
@@ -125,6 +133,9 @@ export class BlackHoleRenderer {
   /** Where the hole sits in the frame, in NDC. Set from the viewport in resize(). */
   private focusX = 0;
   private focusY = 0;
+  /** Camera distance, in Rs. Derived from the viewport so the hole keeps its
+   *  proportion of the frame at any aspect. */
+  private camDistance = 26 * RS;
 
   constructor(options: BlackHoleOptions) {
     this.reducedMotion = options.reducedMotion ?? false;
@@ -298,6 +309,17 @@ export class BlackHoleRenderer {
     this.camera.aspect = w / Math.max(h, 1);
     this.camera.updateProjectionMatrix();
 
+    // Frame the hole against the smaller viewport dimension, so a tall phone
+    // gets the same composition a wide desktop does rather than a hole that
+    // overflows the width.
+    const aspect = w / Math.max(h, 1);
+    const halfFovTan = Math.tan((FOV * Math.PI) / 360);
+    const targetShadowNdc = SHADOW_FRACTION * Math.min(1, aspect);
+    this.camDistance = Math.min(
+      90 * RS,
+      Math.max(18 * RS, SHADOW_RADIUS / (halfFovTan * targetShadowNdc)),
+    );
+
     // Wide viewports put the copy on the left, so the hole moves right of
     // centre. Narrow ones stack copy underneath, so it lifts instead.
     if (w >= 900) {
@@ -305,7 +327,7 @@ export class BlackHoleRenderer {
       this.focusY = 0.04;
     } else {
       this.focusX = 0;
-      this.focusY = 0.34;
+      this.focusY = 0.46;
     }
 
     this.resizeTargets();
@@ -435,7 +457,7 @@ export class BlackHoleRenderer {
     // Dolly in over the intro, then breathe.
     const breathe = 1 + 0.02 * Math.sin(t * 0.21);
     const introEase = 1 - Math.pow(1 - this.intro, 3);
-    const distance = CAM_DISTANCE * breathe * (1 + 0.45 * (1 - introEase));
+    const distance = this.camDistance * breathe * (1 + 0.45 * (1 - introEase));
 
     const cosE = Math.cos(elevation);
     this.prevCamPos.copy(this.camera.position);

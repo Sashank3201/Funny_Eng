@@ -18,7 +18,7 @@ export function renderHeroContent(root: ParentNode): void {
       ...content.actions.map((action) => {
         const a = document.createElement('a');
         a.className = action.primary
-          ? 'btn btn--primary glass glass--pill'
+          ? 'btn btn--primary glass glass--pill glass--accent'
           : 'btn glass glass--pill';
         a.href = action.href;
         a.textContent = action.label;
