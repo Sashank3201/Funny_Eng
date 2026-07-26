@@ -28,11 +28,14 @@ function applyMeta(): void {
   if (description) description.setAttribute('content', content.meta.description);
 }
 
-/** `?tier=high|medium|low` pins quality — used by the physics self-test, which
- *  needs a known march resolution to measure against. */
+/** `?tier=high|medium|low|floor` pins quality — used by the physics self-test,
+ *  which needs a known march resolution to measure against, and as the escape
+ *  hatch if the governor has not settled somewhere comfortable. */
 function forcedTier(): TierName | undefined {
   const value = new URLSearchParams(location.search).get('tier');
-  return value === 'high' || value === 'medium' || value === 'low' ? value : undefined;
+  return value === 'high' || value === 'medium' || value === 'low' || value === 'floor'
+    ? value
+    : undefined;
 }
 
 function boot(): void {
@@ -84,11 +87,8 @@ function boot(): void {
       window.scrollY > window.innerHeight * 0.35,
     );
 
-    const progress = scrollProgress();
-    let pose = poseForProgress(progress);
-    if (narrow()) {
-      pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight, progress);
-    }
+    let pose = poseForProgress(scrollProgress());
+    if (narrow()) pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight);
     renderer.setCamera(applyPointer(pose, pointer.x, pointer.y));
   };
 

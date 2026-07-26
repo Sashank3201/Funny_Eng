@@ -93,7 +93,14 @@ const lum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
   // screenshot of a live WebGL canvas can sit well past Playwright's 30 s
   // default before it returns.
   page.setDefaultTimeout(120000);
-  await page.goto(BASE + '?tier=high', { waitUntil: 'load' });
+
+  // The phone pass runs at the *detected* tier, not a forced one. Forcing high
+  // here measured a render no phone ever produces — and since contrast is
+  // measured against the live pixels, a brighter or sharper render than the real
+  // one makes the whole check a fiction. Desktop stays pinned so the laptop
+  // baseline remains comparable between runs.
+  const url = vp.label === 'mobile' ? BASE : BASE + '?tier=high';
+  await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(12000);
 
   const worst = [];

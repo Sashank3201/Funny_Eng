@@ -3,9 +3,28 @@
  *
  * Measures the *rendered* image against closed-form general relativity. If the
  * geodesic integrator were subtly wrong — bad initial conditions, a sign error,
- * too few steps — the shadow would come out the wrong size and this would catch
- * it. Nothing here reads the shader's own constants; it compares pixels to
- * theory.
+ * a bad step — the shadow would come out the wrong size and this would catch it.
+ * Nothing here reads the shader's own constants; it compares pixels to theory.
+ *
+ * SCOPE, and read this before quoting the number.
+ *
+ * The URL pins `steps=700`, far above any shipping tier (high is 320, floor is
+ * 120). So what this validates is the *integrator*: given enough steps, does the
+ * marched shadow converge on `sin ψ = b_crit √(1 − 2M/r₀) / r₀`? It does, to
+ * about 1 %.
+ *
+ * It is **not** a measurement of what the site renders. Re-run against the
+ * shipped budgets and the shadow comes out substantially too large:
+ *
+ *     steps=700   0.98 %      high  320   26.7 %
+ *     medium 260  27.2 %      low   200   32.5 %      floor 120  39.2 %
+ *
+ * The cause is in `geodesic.frag.glsl`: a ray that exhausts MAX_STEPS is neither
+ * captured nor escaped, and falls through to being drawn as shadow. Those rays
+ * are concentrated in the winding region just outside the photon sphere — which
+ * is precisely where lensed sky belongs — so the shadow grows into the ring.
+ * More steps, or sampling the sky for undecided rays, would both fix it, and
+ * both change how the render looks.
  */
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';

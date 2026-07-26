@@ -144,37 +144,23 @@ export function poseForProgress(progress: number): CameraState {
  * hole bigger put those columns at 0.83 and 0.55, cropping both limbs. The
  * horizontal fit is the binding constraint on a phone and there is no slack in it.
  *
- * So the inclination opens instead, and this is what actually makes the narrow
- * layout work. The desktop poses are near edge-on, which is right beside a column
- * of type — the disk becomes a horizontal blade and the composition is a wide
- * diagonal. Stacked in a tall frame that same blade is a thin bar with dead space
- * above and below it. Tilting to about 16° opens the disk into an ellipse: the
- * width is unchanged, so nothing new crops, but the height grows to fill the
- * frame and the ring closes over and under the shadow. Same scene, turned to
- * suit the aspect it is being shown in.
- *
- * The tilt is spent on the hero and given back immediately afterwards. That
- * extra height is free over the hero, whose copy is all in the lower half, and
- * costly everywhere else: the later sections are tall enough that their text
- * reaches the upper third, and holding the open tilt through them put a section
- * label at 3.42 against its 4.5 threshold. By the time the first section arrives
- * the disk has closed back to the pose's own inclination, which is the thin blade
- * that leaves the frame clear. Scrolling therefore shuts the disk like an
- * aperture, which is a better transition than the constant tilt would have been.
+ * The inclination is deliberately *not* changed. A previous version opened it to
+ * about 16° on narrow screens, reasoning that a thin edge-on blade wastes a tall
+ * frame. That was solving the wrong problem: the phone did not look bad because
+ * of the pose, it looked bad because it was rendering at a quarter of the march
+ * density the laptop uses, and no framing rescues a blob. Now that the tier
+ * ladder is fixed, the phone keeps the pose's own near-edge-on inclination — the
+ * razor through the photon ring with the arcs closing over and under it, which
+ * is the thing that makes the laptop view work.
  */
-export function adaptForNarrow(pose: CameraState, aspect: number, progress: number): CameraState {
+export function adaptForNarrow(pose: CameraState, aspect: number): CameraState {
   const fit = Math.min(2.2, Math.max(1, 1 / Math.max(aspect, 0.01))) * 1.06;
-
-  /** 1 on the hero, 0 once the first section is in view. */
-  const open = 1 - smoothstep((progress - 0.05) / 0.27);
-  const HERO_TILT = 0.28; // radians, ~16°
 
   return {
     ...pose,
     distance: pose.distance * fit,
-    elevation: lerp(pose.elevation, HERO_TILT, open),
     focusX: pose.focusX * 0.18,
-    focusY: pose.focusY * 0.3 + lerp(0.44, 0.34, open),
+    focusY: pose.focusY * 0.3 + 0.44,
   };
 }
 

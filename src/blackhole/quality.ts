@@ -12,7 +12,7 @@
  * resolution acceptable.
  */
 
-export type TierName = 'high' | 'medium' | 'low';
+export type TierName = 'high' | 'medium' | 'low' | 'floor';
 
 export interface Tier {
   name: TierName;
@@ -30,6 +30,35 @@ export interface Tier {
   jets: boolean;
 }
 
+/**
+ * What actually decides how this looks is the *march density*
+ *
+ *     D = min(devicePixelRatio, maxPixelRatio) · rayScale
+ *
+ * — geodesic samples per CSS pixel — and the upscale to the physical panel that
+ * follows from it, `U = devicePixelRatio / D`.
+ *
+ * That number is why the phone looked nothing like the laptop. A laptop at
+ * `high` with dpr 2 gets D = 1.575 and U = 1.27×. A phone at dpr 3 hit the old
+ * `low` cap of 1.25 and, with rayScale 0.50, got **D = 0.625 and U = 4.8×**: the
+ * march ran 246 px across and was stretched onto a 1179 px panel. The photon
+ * ring is about 4.6 px wide on the laptop, so it landed at roughly one pixel and
+ * disappeared. Nothing survives that, which is why it read as a noisy blob
+ * rather than as a black hole.
+ *
+ * On a phone the cap is the binding constraint, not `rayScale` — dpr is 3, so
+ * raising the cap buys resolution far more directly than raising the scale.
+ *
+ * The other half is `maxStepAngle`. The march steps by
+ * `maxStepAngle · clamp(r / 6Rs, 0.07, 1)`, so 0.15 rad samples the winding
+ * region outside the photon sphere less than half as finely as 0.07 — which
+ * degrades the *shape* of the lensed arcs, not merely their sharpness.
+ *
+ * Per-frame integration cost goes as `w · h · D² · maxSteps`. Because a phone
+ * has roughly an eighth of a laptop's CSS area, the old `low` was doing about
+ * 1/66 of the laptop's work. The ladder below spends about 5.7× that at `low`
+ * and is still an order of magnitude under the laptop.
+ */
 export const TIERS: Record<TierName, Tier> = {
   high: {
     name: 'high',
@@ -42,15 +71,27 @@ export const TIERS: Record<TierName, Tier> = {
   },
   medium: {
     name: 'medium',
-    rayScale: 0.68,
-    maxSteps: 200,
-    maxStepAngle: 0.10,
-    bloomLevels: 4,
-    maxPixelRatio: 1.5,
+    rayScale: 0.72,
+    maxSteps: 260,
+    maxStepAngle: 0.085,
+    bloomLevels: 5,
+    maxPixelRatio: 2.0,
     jets: true,
   },
   low: {
     name: 'low',
+    rayScale: 0.66,
+    maxSteps: 200,
+    maxStepAngle: 0.10,
+    bloomLevels: 4,
+    maxPixelRatio: 1.75,
+    jets: true,
+  },
+  // The old `low`, kept as the bottom of the ladder. The governor only ever
+  // demotes, so raising `low` without leaving something beneath it would have
+  // taken away its escape route on hardware that genuinely cannot cope.
+  floor: {
+    name: 'floor',
     rayScale: 0.50,
     maxSteps: 120,
     maxStepAngle: 0.15,
@@ -60,7 +101,7 @@ export const TIERS: Record<TierName, Tier> = {
   },
 };
 
-const ORDER: TierName[] = ['high', 'medium', 'low'];
+const ORDER: TierName[] = ['high', 'medium', 'low', 'floor'];
 
 interface NavigatorWithMemory extends Navigator {
   deviceMemory?: number;
@@ -73,8 +114,6 @@ export function detectTier(): Tier {
   const nav = navigator as NavigatorWithMemory;
   const cores = nav.hardwareConcurrency ?? 4;
   const memory = nav.deviceMemory ?? 4;
-  const dpr = window.devicePixelRatio || 1;
-  const shortSide = Math.min(window.innerWidth, window.innerHeight);
   const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
   let score = 0;
@@ -84,15 +123,24 @@ export function detectTier(): Tier {
   if (memory >= 8) score += 2;
   else if (memory >= 4) score += 1;
 
-  // A phone pushing a 3x display is the classic case where the static signals
-  // look fine and the fill-rate does not.
+  // Touch hardware is still worth a real penalty: it is the one signal that
+  // reliably means "mobile GPU".
   if (coarsePointer) score -= 2;
-  if (dpr > 2.5) score -= 1;
-  if (shortSide < 500) score -= 1;
+
+  // Deliberately no longer penalised: high devicePixelRatio and a small short
+  // side. Both were double-counting. A dense phone screen does not mean more
+  // work — `maxPixelRatio` already caps what is rendered per CSS pixel, and a
+  // small viewport means *fewer* CSS pixels to cover, so the two together made
+  // the cheapest devices score lowest. Stacked on the touch penalty they pushed
+  // a perfectly ordinary phone (4 cores, 8 GB) to −1, i.e. the bottom tier, and
+  // that is what has been rendering the hole as a blob. The governor demotes
+  // within about two seconds if this guess is too generous, and it now has
+  // three rungs to fall through; a pessimistic static probe cannot be undone.
 
   if (score >= 4) return TIERS.high;
   if (score >= 1) return TIERS.medium;
-  return TIERS.low;
+  if (score >= -1) return TIERS.low;
+  return TIERS.floor;
 }
 
 /**
