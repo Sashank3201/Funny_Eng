@@ -1,10 +1,11 @@
 import './styles/main.css';
 
 import { GeodesicRenderer } from './blackhole/GeodesicRenderer';
+import type { CameraState } from './blackhole/GeodesicRenderer';
 import type { TierName } from './blackhole/quality';
 import { content } from './content';
-import { adaptForNarrow, applyPointer, poseForProgress } from './scroll/choreography';
-import { activeSection, mountNav, updateNav } from './ui/nav';
+import { KEYFRAMES, adaptForNarrow, applyPointer, poseForProgress } from './scroll/choreography';
+import { activeSection, mountNav, setCameraHooks, updateNav } from './ui/nav';
 import { observeReveals, renderChrome, renderSections } from './ui/sections';
 
 function supportsWebGL(): boolean {
@@ -76,6 +77,8 @@ function boot(): void {
 
   const pointer = { x: 0, y: 0 };
   const narrow = () => window.innerWidth < 900;
+  /** Held camera pose that outranks the scroll position, for map previews. */
+  let override: CameraState | null = null;
 
   /**
    * Scroll position and pointer both feed one pose, which the renderer damps
@@ -91,12 +94,66 @@ function boot(): void {
 
     let pose = poseForProgress(scrollProgress());
     if (narrow()) pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight);
-    renderer.setCamera(applyPointer(pose, pointer.x, pointer.y));
 
-    // The dial reads the same pose the renderer was just handed, so the marker
-    // and the camera cannot drift apart.
+    // A held override beats the scroll pose. Without this the preview would last
+    // one frame: scroll and pointermove both land here, and either would put the
+    // camera straight back where the scroll position says it belongs.
+    renderer.setCamera(override ?? applyPointer(pose, pointer.x, pointer.y));
+
+    // The dial always reports the *scroll* azimuth, which is what a released
+    // preview has to fall back to.
     updateNav(pose.azimuth, activeSection());
   };
+
+  /**
+   * The map's station hover flies the real camera.
+   *
+   * The renderer already damps toward whatever pose it is handed, so a preview
+   * is just handing it a different one — there is no second animation system
+   * here, and letting go returns to whatever the scroll position says.
+   */
+  const poseFor = (id: string) => {
+    const i = KEYFRAMES.findIndex((k) => k.id === id);
+    if (i < 0) return null;
+    let pose = poseForProgress(i / (KEYFRAMES.length - 1));
+    if (narrow()) pose = adaptForNarrow(pose, window.innerWidth / window.innerHeight);
+    return pose;
+  };
+
+  let settleTimer = 0;
+  const clearOverride = () => {
+    window.clearTimeout(settleTimer);
+    override = null;
+    syncCamera();
+  };
+
+  setCameraHooks({
+    preview(id) {
+      const pose = poseFor(id);
+      if (!pose) return;
+      window.clearTimeout(settleTimer);
+      override = pose;
+      syncCamera();
+    },
+    release: clearOverride,
+    settle(id) {
+      const pose = poseFor(id);
+      if (!pose) return;
+      if (reducedMotion) {
+        clearOverride();
+        return;
+      }
+      // Carry a little past the target and let the damping fall back into it,
+      // so arriving reads as an orbit catching rather than a value snapping.
+      // Held for the length of the smooth scroll, which would otherwise drive
+      // the camera straight to the destination with no swing at all.
+      const first = KEYFRAMES.findIndex((k) => k.id === id) === 0;
+      override = { ...pose, azimuth: pose.azimuth + (first ? -0.16 : 0.16) };
+      syncCamera();
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(clearOverride, 620);
+    },
+  });
 
   syncCamera();
   renderer.start();

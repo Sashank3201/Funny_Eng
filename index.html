@@ -36,20 +36,19 @@
         type="button"
         data-navtoggle
         aria-expanded="false"
-        aria-controls="nav-sheet"
+        aria-controls="orbit-map"
       >
-        <span class="navtoggle__label">Menu</span>
+        <span class="navtoggle__label">Map</span>
       </button>
     </header>
 
-    <!-- Narrow screens cannot hold the ring, three links and the availability
-         line on one row, so the links move in here. A solid panel is the right
-         answer for a temporary overlay in a way it never was for persistent
-         chrome: it sidesteps the live render entirely. -->
-    <div class="sheet" id="nav-sheet" data-sheet hidden>
-      <nav class="sheet__nav" data-sheet-nav aria-label="Sections"></nav>
-      <p class="sheet__status" data-sheet-status></p>
-    </div>
+    <!-- The dial expanded. A native <dialog> so focus trapping, inertness of the
+         page behind, and Escape-to-close are the browser's job rather than mine.
+         Contents are built in ui/nav.ts from the same KEYFRAMES the camera uses. -->
+    <dialog class="map" id="orbit-map" data-map aria-label="Sections">
+      <div class="map__stage" data-map-stage></div>
+      <p class="map__status" data-sheet-status></p>
+    </dialog>
 
     <!-- Live annotation of what the simulation is actually integrating. -->
     <aside class="readout" data-readout aria-hidden="true"></aside>

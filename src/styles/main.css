@@ -357,11 +357,198 @@ body {
   background: var(--ember);
 }
 
-/* The sheet toggle and the sheet itself are the narrow-screen arrangement; both
-   are hidden until the media query below turns them on. */
-.navtoggle,
-.sheet {
+/* The toggle is the narrow-screen way in; on desktop the dial itself is. */
+.navtoggle {
   display: none;
+}
+
+/* The header nav says the same three words the map does, so it steps aside
+   while the map is open rather than doubling it. */
+.is-map-open .chrome__nav,
+.is-map-open .readout {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease);
+}
+
+/* ================================================================== map == */
+
+/*
+ * The dial, expanded.
+ *
+ * A native <dialog> so focus trapping, page inertness and Escape are the
+ * browser's, not mine. It opens by growing out of the dial's own position —
+ * `--from-x/y` are written from the dial's bounding rect at open time — so it
+ * reads as the same instrument enlarged rather than a panel arriving.
+ */
+.map {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.map::backdrop {
+  /* Dark enough that the map is the subject and the render is only texture
+     behind it. At 0.55 the hero copy read straight through; at 0.82 it still
+     collided with the station labels on a phone, where the copy sits in the
+     same band as the ring. */
+  background: rgba(4, 5, 10, 0.93);
+  opacity: 0;
+  transition: opacity 0.42s var(--ease);
+}
+
+.map.is-open::backdrop {
+  opacity: 1;
+}
+
+.map__stage {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(74vmin, 40rem);
+  aspect-ratio: 1;
+  /* Starts as a small disc sitting exactly where the dial is — `--dx/--dy` are
+     the dial's offset from the viewport centre, written at open time — and grows
+     into place. That is what makes it the same object rather than a new one. */
+  transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, 0px))) scale(0.06);
+  transform-origin: 50% 50%;
+  opacity: 0;
+  transition:
+    transform 0.52s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.3s var(--ease);
+}
+
+.map.is-open .map__stage {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.map__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.map__path {
+  fill: none;
+  stroke: rgba(242, 239, 233, 0.14);
+  stroke-width: 0.35;
+}
+
+.map__arc {
+  fill: none;
+  stroke: rgba(242, 239, 233, 0.4);
+  stroke-width: 0.5;
+  stroke-linecap: round;
+}
+
+.map__photon {
+  fill: none;
+  stroke: rgba(255, 178, 107, 0.5);
+  stroke-width: 0.3;
+}
+
+.map__shadow {
+  fill: #04050a;
+}
+
+.map__station {
+  fill: rgba(242, 239, 233, 0.45);
+}
+
+.map__marker {
+  fill: var(--ember);
+  transition: cx 0.5s var(--ease), cy 0.5s var(--ease);
+}
+
+/* Stations are anchors laid over the dial, positioned at their true azimuth.
+   They fade in along the arc rather than all at once, which is the difference
+   between the map assembling and a menu appearing. */
+.station {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  transform: translate(-50%, -50%);
+  padding: 0.5rem 0.7rem;
+  font-family: var(--mono);
+  text-decoration: none;
+  color: var(--ink-dim);
+  white-space: nowrap;
+  opacity: 0;
+  transition:
+    opacity 0.4s var(--ease),
+    color 0.25s var(--ease);
+  transition-delay: calc(0.12s + var(--i, 0) * 0.07s);
+}
+
+.map.is-open .station {
+  opacity: 1;
+}
+
+.station__index {
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-faint);
+}
+
+.station__name {
+  font-family: var(--headline);
+  font-weight: 900;
+  font-size: clamp(1.3rem, 4vw, 2.1rem);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.station__radius {
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  color: var(--ember);
+}
+
+.station:hover,
+.station:focus-visible {
+  color: var(--ember);
+}
+
+.station:hover .station__name,
+.station:focus-visible .station__name {
+  color: var(--ember);
+}
+
+.station.is-active .station__index {
+  color: var(--ember);
+}
+
+.map__status {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(1.2rem, 4vh, 2.4rem);
+  transform: translateX(-50%);
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ember);
+  opacity: 0;
+  transition: opacity 0.4s var(--ease) 0.34s;
+}
+
+.map.is-open .map__status {
+  opacity: 1;
 }
 
 /* The instrument readout — states what the renderer is actually doing. It
@@ -987,60 +1174,26 @@ main {
     color: var(--ember);
   }
 
-  /* Below the header, not above it: the toggle has to stay reachable to close
-     the sheet again. */
-  .sheet {
-    position: fixed;
-    z-index: 6;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 0.4rem;
-    padding: 0 var(--gutter);
-    /* Fully opaque. At 0.985 the hero copy ghosted through behind the links,
-       which reads as a rendering fault rather than as depth. */
-    background: var(--void);
+  /*
+   * The map is the whole navigation on a phone, which is why the sheet it
+   * replaced is gone rather than kept alongside it. The stations sit closer in
+   * and the type comes down, because at 393 px the labels have to live inside
+   * the ring instead of ranged around the outside of it.
+   */
+  .map__stage {
+    width: min(86vmin, 26rem);
   }
 
-  .chrome {
-    z-index: 7;
+  .station {
+    padding: 0.35rem 0.45rem;
   }
 
-  .sheet__nav {
-    display: flex;
-    flex-direction: column;
+  .station__name {
+    font-size: 1.35rem;
   }
 
-  /* Author styles outrank the UA rule for [hidden], so without this the sheet
-     stays on screen after being closed. */
-  .sheet[hidden] {
-    display: none;
-  }
-
-  .sheet__link {
-    display: block;
-    padding: 0.7rem 0;
-    font-family: var(--headline);
-    font-size: 2.4rem;
-    font-weight: 900;
-    letter-spacing: -0.02em;
-    text-transform: uppercase;
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  .sheet__link.is-active {
-    color: var(--ember);
-  }
-
-  .sheet__status {
-    margin: 1.6rem 0 0;
-    font-family: var(--mono);
-    font-size: 0.66rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--ember);
+  .station__radius {
+    font-size: 0.55rem;
   }
 
   /* Fixed to the corner, it lands on top of the copy once the sections get
