@@ -208,7 +208,7 @@ export class GeodesicRenderer {
       uGrain: { value: 0.012 },
       uVignette: { value: 0.48 },
       uContrast: { value: 0.18 },
-      uSaturation: { value: 1.34 },
+      uSaturation: { value: 1.22 },
       uKneeThreshold: { value: 0.50 },
       uKneeStrength: { value: 0.32 },
       // How much of the local structure survives the compression. 1.0 is full
@@ -268,9 +268,9 @@ export class GeodesicRenderer {
       uJetOn: { value: this.tier.jets ? 1 : 0 },
       uFlatSky: { value: 0 },
       uTime: { value: 0 },
-      uDiskTemp: { value: 3850 },
-      uDiskBrightness: { value: 0.85 },
-      uDiskOpacity: { value: 0.10 },
+      uDiskTemp: { value: 4120 },
+      uDiskBrightness: { value: 2.6 },
+      uDiskOpacity: { value: 0.85 },
       uDiskHR: { value: DISK_SCALE_HEIGHT },
       uDiskSpin: { value: 1 },
       uJetBrightness: { value: 0.22 },
@@ -637,11 +637,11 @@ export class GeodesicRenderer {
   /** Turn the disk and jets off so the shadow's silhouette can be measured. */
   setFeatures(disk: boolean, jets: boolean): void {
     const u = this.geodesic.material.uniforms;
-    u.uDiskBrightness.value = disk ? 0.85 : 0;
+    u.uDiskBrightness.value = disk ? 2.6 : 0;
     // Opacity has to go too. Zeroing only the emission would leave invisible
     // gas still absorbing, and the shadow test would measure that rather than
     // the silhouette.
-    u.uDiskOpacity.value = disk ? 0.10 : 0;
+    u.uDiskOpacity.value = disk ? 0.85 : 0;
     u.uJetOn.value = jets && this.tier.jets ? 1 : 0;
     this.historyDirty = true;
   }
@@ -759,12 +759,8 @@ export class GeodesicRenderer {
   setGrade(values: Record<string, number>): void {
     const c = this.composite.material.uniforms;
     const b = this.bright.material.uniforms;
-    // The geodesic pass is included: disk brightness and opacity are as much a
-    // part of how this looks as anything in the composite, and tuning them by
-    // rebuilding rather than by sweeping wastes minutes per candidate.
-    const g = this.geodesic.material.uniforms;
     for (const [name, v] of Object.entries(values)) {
-      const target = name in c ? c : name in b ? b : name in g ? g : null;
+      const target = name in c ? c : name in b ? b : null;
       if (!target) throw new Error(`unknown grade uniform: ${name}`);
       target[name].value = v;
     }
