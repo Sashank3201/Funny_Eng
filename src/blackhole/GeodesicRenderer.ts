@@ -269,7 +269,7 @@ export class GeodesicRenderer {
       uFlatSky: { value: 0 },
       uTime: { value: 0 },
       uDiskTemp: { value: 4120 },
-      uDiskBrightness: { value: 2.6 },
+      uDiskBrightness: { value: 3.4 },
       uDiskOpacity: { value: 0.85 },
       uDiskHR: { value: DISK_SCALE_HEIGHT },
       uDiskSpin: { value: 1 },
@@ -637,7 +637,7 @@ export class GeodesicRenderer {
   /** Turn the disk and jets off so the shadow's silhouette can be measured. */
   setFeatures(disk: boolean, jets: boolean): void {
     const u = this.geodesic.material.uniforms;
-    u.uDiskBrightness.value = disk ? 2.6 : 0;
+    u.uDiskBrightness.value = disk ? 3.4 : 0;
     // Opacity has to go too. Zeroing only the emission would leave invisible
     // gas still absorbing, and the shadow test would measure that rather than
     // the silhouette.
@@ -759,8 +759,12 @@ export class GeodesicRenderer {
   setGrade(values: Record<string, number>): void {
     const c = this.composite.material.uniforms;
     const b = this.bright.material.uniforms;
+    // The geodesic pass too: disk brightness and opacity shape how this looks as
+    // much as anything in the composite, and rebuilding per candidate to tune
+    // them wastes minutes each.
+    const g = this.geodesic.material.uniforms;
     for (const [name, v] of Object.entries(values)) {
-      const target = name in c ? c : name in b ? b : null;
+      const target = name in c ? c : name in b ? b : name in g ? g : null;
       if (!target) throw new Error(`unknown grade uniform: ${name}`);
       target[name].value = v;
     }
